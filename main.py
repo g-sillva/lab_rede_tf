@@ -6,6 +6,7 @@ import os
 import time
 import select
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 ICMP_ECHO_REQUEST = 8
 ICMP_ECHO_REPLY = 0
@@ -32,23 +33,24 @@ def checksum(source_string):
     answer = answer >> 8 | (answer << 8 & 0xff00)
     return answer
 
+
 def create_icmp_packet(identifier):
     """Cria um pacote ICMP"""
     header = struct.pack("bbHHh", ICMP_ECHO_REQUEST, 0, 0, identifier, 1)
     data = b'Ping!' + (192 * b'Q')
     checksum_value = checksum(header + data)
-    header = struct.pack("bbHHh", ICMP_ECHO_REQUEST, 0, socket.htons(checksum_value), identifier, 1)
+    header = struct.pack("bbHHh", ICMP_ECHO_REQUEST, 0,
+                         socket.htons(checksum_value), identifier, 1)
     return header + data
+
 
 def send_ping(sock, dest_addr, identifier):
     """Envia um pacote ICMP"""
-
     icmp_header = create_icmp_packet(identifier)
+    sock.sendto(icmp_header, (dest_addr, 0))
 
-    packet = icmp_header
-    sock.sendto(packet, (dest_addr, 0))
 
-def receive_ping(sock, identifier, timeout=1):
+def receive_ping(sock, identifier, dest_addr, timeout=1):
     """Recebe pacotes ICMP"""
     time_left = timeout
     while True:
@@ -59,66 +61,81 @@ def receive_ping(sock, identifier, timeout=1):
             return None
 
         time_received = time.time()
-        packet, _ = sock.recvfrom(1024)
-        icmp_header = packet[20:28]
-        type, code, checksum, packet_id, sequence = struct.unpack("bbHHh", icmp_header)
+        packet, addr = sock.recvfrom(1024)
 
-        if type == ICMP_ECHO_REPLY and packet_id == identifier:
+        # Verificar o endereço de origem
+        if addr[0] != dest_addr:
+            continue
+
+        # Extração do cabeçalho ICMP
+        icmp_header = packet[20:28]
+        icmp_type, _, _, packet_id, _ = struct.unpack("bbHHh", icmp_header)
+
+        # Verificar o tipo ICMP e o identificador
+        if icmp_type == ICMP_ECHO_REPLY and packet_id == identifier:
             return time_received
 
         time_left = time_left - time_spent
         if time_left <= 0:
             return None
 
+
 def ping(dest_addr):
     """Função principal para enviar e receber pings"""
     try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
+        sock = socket.socket(
+            socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
     except PermissionError:
-        print("Permissão negada")
-        return
+        print("Permissão negada. Execute o script como administrador.")
+        return None
 
     identifier = os.getpid() & 0xFFFF
     send_ping(sock, dest_addr, identifier)
-    # print(f"Enviando ping para {dest_addr}...")
 
     start_time = time.time()
-    response = receive_ping(sock, identifier)
+    response = receive_ping(sock, identifier, dest_addr)
+    sock.close()
+
     if response:
         delay = (response - start_time) * 1000
         return delay
-        # print(f"Resposta de {dest_addr} em {delay:.2f}ms")
-
-    sock.close()
     return None
 
-def main():
 
-    if not len(sys.argv) > 1:
+def ping_host(ip):
+    """Função wrapper para pingar um único IP"""
+    return ip, ping(ip)
+
+
+def main():
+    if len(sys.argv) < 2:
         print("Usage: python main.py <network>")
-        print("Example: python main.py 127.0.0.0/28")
+        print("Example: python main.py 192.168.1.0/24")
         return
 
     network_ips = get_ips_by_input(sys.argv[1])
-    
+
     print("=========================================")
     print(f"Scanning {len(network_ips)} IPs")
-    print(f"{network_ips[0]} - Last {network_ips[-1]}")
+    print(f"First: {network_ips[0]} - Last: {network_ips[-1]}")
     print("=========================================")
 
-    # Store icmp results
+    # Store ICMP results
     icmp_results = {}
 
-    for ip in network_ips:
-        print(f"Scanning {ip}")
-        
-        ping_response = ping(ip)
-        if ping_response:
-            icmp_results[ip] = ping_response
+    # Usar ThreadPoolExecutor para rodar pings em paralelo
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(ping_host, ip) for ip in network_ips]
+
+        for future in as_completed(futures):
+            ip, ping_response = future.result()
+            if ping_response is not None:
+                icmp_results[ip] = ping_response
 
     print("\nFound IPs with ICMP response:")
     for ip, delay in icmp_results.items():
         print(f"IP: {ip} - Delay: {delay:.2f}ms")
+
 
 if __name__ == '__main__':
     main()
