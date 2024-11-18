@@ -1,5 +1,3 @@
-from cli_utils import get_ips_by_input
-
 import socket
 import struct
 import os
@@ -7,6 +5,7 @@ import time
 import select
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from cli_utils import get_ips_by_input
 
 ICMP_ECHO_REQUEST = 8
 ICMP_ECHO_REPLY = 0
@@ -33,6 +32,32 @@ def checksum(source_string):
     answer = answer >> 8 | (answer << 8 & 0xff00)
     return answer
 
+def create_ip_header(src_addr, dest_addr):
+    """Cria um cabeçalho IP"""
+    ip_ihl = 5
+    ip_ver = 4
+    ip_tos = 0
+    ip_tot_len = 20 + 8  # IP Header + ICMP Header
+    ip_id = 54321
+    ip_frag_off = 0
+    ip_ttl = 255
+    ip_proto = socket.IPPROTO_ICMP
+    ip_check = 0
+    ip_saddr = socket.inet_aton(src_addr)
+    ip_daddr = socket.inet_aton(dest_addr)
+
+    ip_ihl_ver = (ip_ver << 4) + ip_ihl
+
+    ip_header = struct.pack('!BBHHHBBH4s4s',
+                            ip_ihl_ver, ip_tos, ip_tot_len, ip_id, ip_frag_off, ip_ttl,
+                            ip_proto, ip_check, ip_saddr, ip_daddr)
+    
+    ip_check = checksum(ip_header)
+    
+    ip_header = struct.pack('!BBHHHBBH4s4s',
+                            ip_ihl_ver, ip_tos, ip_tot_len, ip_id, ip_frag_off, ip_ttl,
+                            ip_proto, socket.htons(ip_check), ip_saddr, ip_daddr)
+    return ip_header
 
 def create_icmp_packet(identifier):
     """Cria um pacote ICMP"""
@@ -43,12 +68,12 @@ def create_icmp_packet(identifier):
                          socket.htons(checksum_value), identifier, 1)
     return header + data
 
-
-def send_ping(sock, dest_addr, identifier):
+def send_ping(sock, src_addr, dest_addr, identifier):
     """Envia um pacote ICMP"""
-    icmp_header = create_icmp_packet(identifier)
-    sock.sendto(icmp_header, (dest_addr, 0))
-
+    icmp_packet = create_icmp_packet(identifier)
+    ip_header = create_ip_header(src_addr, dest_addr)
+    packet = ip_header + icmp_packet
+    sock.sendto(packet, (dest_addr, 0))
 
 def receive_ping(sock, identifier, dest_addr, timeout=1):
     """Recebe pacotes ICMP"""
@@ -79,18 +104,19 @@ def receive_ping(sock, identifier, dest_addr, timeout=1):
         if time_left <= 0:
             return None
 
-
 def ping(dest_addr):
     """Função principal para enviar e receber pings"""
     try:
         sock = socket.socket(
             socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
     except PermissionError:
         print("Permissão negada. Execute o script como administrador.")
         return None
 
+    src_addr = socket.gethostbyname(socket.gethostname())
     identifier = os.getpid() & 0xFFFF
-    send_ping(sock, dest_addr, identifier)
+    send_ping(sock, src_addr, dest_addr, identifier)
 
     start_time = time.time()
     response = receive_ping(sock, identifier, dest_addr)
@@ -101,11 +127,9 @@ def ping(dest_addr):
         return delay
     return None
 
-
 def ping_host(ip):
     """Função wrapper para pingar um único IP"""
     return ip, ping(ip)
-
 
 def main():
     if len(sys.argv) < 2:
@@ -113,7 +137,8 @@ def main():
         print("Example: python main.py 192.168.1.0/24")
         return
 
-    network_ips = get_ips_by_input(sys.argv[1])
+    network_ips = ['192.168.240.26']
+    # network_ips = get_ips_by_input(sys.argv[1])
 
     print("=========================================")
     print(f"Scanning {len(network_ips)} IPs")
@@ -135,7 +160,6 @@ def main():
     print("\nFound IPs with ICMP response:")
     for ip, delay in icmp_results.items():
         print(f"IP: {ip} - Delay: {delay:.2f}ms")
-
 
 if __name__ == '__main__':
     main()
