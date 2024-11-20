@@ -1,9 +1,11 @@
 import sys
 import socket
+import platform
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from e1.ping import ping_host
 from e1.cli_utils import get_ips_by_input
+from util import get_local_ip
 
 def find_network_hosts():
     if len(sys.argv) < 2 or not sys.argv[1].count('/'):
@@ -12,7 +14,8 @@ def find_network_hosts():
        sys.exit(1)
        return
      
-    source_ip = socket.gethostbyname(socket.gethostname())
+    source_ip = get_local_ip()
+
     network_ips = get_ips_by_input(sys.argv[1])
     #network_ips = ['192.168.0.1']
 
