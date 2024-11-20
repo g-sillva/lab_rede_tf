@@ -1,6 +1,3 @@
-import sys
-
-
 def get_ips_by_input(network):
     ips = []
 

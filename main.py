@@ -1,71 +1,61 @@
-import socket
-import os
-import time
 import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from cli_utils import get_ips_by_input
-from icmp import send_ping, receive_ping
+import socket
 
+from e1.run import find_network_hosts
+from e2.run import run_arp_spoofing
+from e2.arp import get_mac_address
 
-def ping(dest_addr):
-    """Função principal para enviar e receber pings"""
-    try:
-        sock = socket.socket(
-            socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
-        sock.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
-    except PermissionError:
-        print("Permissão negada. Execute o script como administrador.")
+def select_target_host(hosts):
+    print("\nSelect the target host to perform the attack:")
+    for host, i in zip(hosts, range(1, len(hosts)+1)):
+        print(f"({i}): {host}")
+    print(f"({len(hosts)+1}): Exit")
+
+    target_host = input("\nEnter the number of the target host: ")
+
+    if not target_host.isdigit() or int(target_host) < 1 or int(target_host) > len(hosts)+1:
+        print("Error: Invalid input")
+        return select_target_host(hosts)
+
+    if int(target_host) == len(hosts)+1:
+        print("Exiting...")
+        sys.exit(0)
         return None
 
-    src_addr = socket.gethostbyname(socket.gethostname())
-    identifier = os.getpid() & 0xFFFF
-    send_ping(sock, src_addr, dest_addr, identifier)
+    target_host = hosts[int(target_host)-1]
 
-    start_time = time.time()
-    response = receive_ping(sock, identifier, dest_addr)
-    sock.close()
+    confirmation = input(f"Do you confirm the target {target_host}? (Y/n): ")
 
-    if response:
-        delay = (response - start_time) * 1000
-        return delay
-    return None
+    if confirmation.lower() == 'n' or confirmation.lower() == 'no':
+        return select_target_host(hosts)
+    elif confirmation and (confirmation.lower() != 'y' and confirmation.lower() != 'yes'):
+        print("Error: Invalid input")
+        return select_target_host(hosts)
 
-
-def ping_host(ip):
-    """Função wrapper para pingar um único IP"""
-    print(f"Pinging {ip}")
-    return ip, ping(ip)
-
+    return target_host
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python main.py <network>")
-        print("Example: python main.py 192.168.1.0/24")
+
+    ########## 1 ##########
+    hosts = find_network_hosts()
+
+    if len(hosts) == 0:
+        print("Error: No active hosts found in the network")
+        return
+    
+    if len(hosts) == 1:
+        print("Error: Found only 1 active host in the network, not enough hosts to perform the attack")
         return
 
-    # network_ips = ['192.168.240.26']
-    network_ips = get_ips_by_input(sys.argv[1])
+    print(f"\nFound {len(hosts)} active hosts in the network")
 
-    print("=========================================")
-    print(f"Scanning {len(network_ips)} IPs")
-    print(f"First: {network_ips[0]} - Last: {network_ips[-1]}")
-    print("=========================================")
+    target_host = select_target_host(hosts)
 
-    # Store ICMP results
-    icmp_results = {}
+    print(f"\nTarget host: {target_host}")
 
-    # Usar ThreadPoolExecutor para rodar pings em paralelo
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        futures = [executor.submit(ping_host, ip) for ip in network_ips]
 
-        for future in as_completed(futures):
-            ip, ping_response = future.result()
-            if ping_response is not None:
-                icmp_results[ip] = ping_response
-
-    print("\nFound IPs with ICMP response:")
-    for ip, delay in icmp_results.items():
-        print(f"IP: {ip} - Delay: {delay:.2f}ms")
+    ########## 2 ##########
+    run_arp_spoofing(target_host)
 
 
 if __name__ == '__main__':

@@ -3,7 +3,7 @@ import struct
 from checksum import checksum
 
 def create_ip_header(src_addr, dest_addr):
-    """Cria um cabeçalho IP"""
+    """Create an IP header"""
     ip_ihl = 5
     ip_ver = 4
     ip_tos = 0
