@@ -17,8 +17,8 @@ def find_network_hosts():
 
     source_ip = get_local_ip()
 
-    # network_ips = get_ips_by_input(sys.argv[1])
-    network_ips = ['192.168.0.1']
+    network_ips = get_ips_by_input(sys.argv[1])
+    # network_ips = ['192.168.0.1']
 
     print("\n            Active hosts scan")
     print("=========================================")
