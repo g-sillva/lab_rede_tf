@@ -14,11 +14,11 @@ ICMP_ECHO_REPLY = 0
 
 def create_icmp_packet(identifier):
     """Create an ICMP packet"""
-    header = struct.pack("bbHHh", ICMP_ECHO_REQUEST, 0, 0, identifier, 1)
+    header = struct.pack("!BBHHH", ICMP_ECHO_REQUEST, 0, 0, identifier, 1)
     data = b'Ping!' + (192 * b'Q')
     checksum_value = checksum(header + data)
-    header = struct.pack("bbHHh", ICMP_ECHO_REQUEST, 0,
-                         socket.htons(checksum_value), identifier, 1)
+    header = struct.pack("!BBHHH", ICMP_ECHO_REQUEST, 0,
+                         checksum_value, identifier, 1)
     return header + data
 
 
