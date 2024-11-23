@@ -189,7 +189,7 @@ def printInfo(totalDiscoveryTime):
 
 def main():
     network = "192.168.0.0/24"
-    waitingTime = 3  # Tempo de espera em segundos
+    waitingTime = 5  # Tempo de espera em segundos
 
     discoveryStart = time.time()
     discover(network, waitingTime)
