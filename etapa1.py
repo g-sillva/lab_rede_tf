@@ -124,21 +124,20 @@ def calculate_checksum(data):
 
 
 class EthernetHeader:
-    def __init__(self):
+    def _init_(self):
         # MAC de origem (ajuste conforme necessário)
         self.src_mac = "08:00:27:ad:25:87"
         self.dst_mac = "FF:FF:FF:FF:FF:FF"  # MAC de destino (broadcast)
         self.ethertype = 0x0800  # Protocolo IPv4
 
     def pack(self):
-        self.ethertype = 0x0800  # Protocolo IPv4
         src_mac_bytes = bytes.fromhex(self.src_mac.replace(":", ""))
         dst_mac_bytes = bytes.fromhex(self.dst_mac.replace(":", ""))
         return dst_mac_bytes + src_mac_bytes + struct.pack("!H", self.ethertype)
 
 
 class IpHeader:
-    def __init__(self, src_ip, dst_ip, ttl=64):
+    def _init_(self, src_ip, dst_ip, ttl=64):
         self.version = 4
         self.ihl = 5
         self.tos = 0
@@ -189,7 +188,7 @@ def printInfo(totalDiscoveryTime):
 
 def main():
     network = "192.168.0.0/24"
-    waitingTime = 5  # Tempo de espera em segundos
+    waitingTime = 1  # Tempo de espera em segundos
 
     discoveryStart = time.time()
     discover(network, waitingTime)
