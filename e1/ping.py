@@ -9,7 +9,12 @@ from e1.icmp import send_ping, receive_ping
 def ping(dest_addr):
     """Main function to send and receive ICMP packets"""
     try:
-        if (platform.system().lower() == 'windows' or platform.system().lower() == 'linux'):
+        if (platform.system().lower() == 'linux'):
+            sock = socket.socket(
+                socket.AF_PACKET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
+            sock.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
+
+        elif (platform.system().lower() == 'windows'):
             sock = socket.socket(
                 socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
             sock.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
