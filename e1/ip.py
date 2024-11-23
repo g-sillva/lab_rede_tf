@@ -26,5 +26,5 @@ def create_ip_header(src_addr, dest_addr):
     
     ip_header = struct.pack('!BBHHHBBH4s4s',
                             ip_ihl_ver, ip_tos, ip_tot_len, ip_id, ip_frag_off, ip_ttl,
-                            ip_proto, socket.htons(ip_check), ip_saddr, ip_daddr)
+                            ip_proto, ip_check, ip_saddr, ip_daddr)
     return ip_header
