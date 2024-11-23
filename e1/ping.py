@@ -1,15 +1,18 @@
 import socket
 import os
 import time
+import platform
 
 from e1.icmp import send_ping, receive_ping
 
 def ping(dest_addr):
     """Main function to send and receive ICMP packets"""
     try:
-
-        sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
-        sock.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
+        if (platform.system().lower() == 'windows'):
+            sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
+            sock.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
+        else:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
 
     except PermissionError:
         print("Permission denied. Try running as root.")

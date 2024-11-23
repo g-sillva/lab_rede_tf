@@ -42,12 +42,8 @@ def main():
     if len(hosts) == 0:
         print("Error: No active hosts found in the network")
         return
-    
-    if len(hosts) == 1:
-        print("Error: Found only 1 active host in the network, not enough hosts to perform the attack")
-        return
 
-    print(f"\nFound {len(hosts)} active hosts in the network")
+    print(f"\nFound {len(hosts)} active host(s) in the network")
 
     target_host = select_target_host(hosts)
 

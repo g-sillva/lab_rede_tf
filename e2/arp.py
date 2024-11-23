@@ -2,6 +2,7 @@ import subprocess
 import re
 import struct
 import socket
+import platform
 
 def send_arp_reply(target_ip, target_mac, source_ip, source_mac):
     """Send an ARP reply"""
@@ -15,8 +16,6 @@ def send_arp_reply(target_ip, target_mac, source_ip, source_mac):
     sock.send(arp_reply)
 
     print(f"ARP reply sent to {target_ip} ({target_mac})")
-
-    
 
 
 def create_arp_reply_header(target_ip, target_mac, source_ip, source_mac):
@@ -36,31 +35,61 @@ def create_arp_reply_header(target_ip, target_mac, source_ip, source_mac):
 
 
 def get_mac_address(ip=None):
-    try:
-        mac_pattern = r"([0-9A-Fa-f]{2}-[0-9A-Fa-f]{2}-[0-9A-Fa-f]{2}-[0-9A-Fa-f]{2}-[0-9A-Fa-f]{2}-[0-9A-Fa-f]{2})"
+    mac_pattern = r"([0-9A-Fa-f]{1,2}[:-][0-9A-Fa-f]{1,2}[:-][0-9A-Fa-f]{1,2}[:-][0-9A-Fa-f]{1,2}[:-][0-9A-Fa-f]{1,2}[:-][0-9A-Fa-f]{1,2})"
 
-        # Local mac address (Windows - Wi-Fi)
-        if not ip:
-            output = subprocess.check_output(["ipconfig", "/all"], encoding="utf-8", errors="ignore")
-            sections = output.split(":\n\n")
+    if not ip:
+        # Local mac address
+        if platform.system().lower() == "windows":
+            try:
+                output = subprocess.check_output(["ipconfig", "/all"], encoding="utf-8", errors="ignore")
+                sections = output.split("\n\n")
+                for section in sections:
+                    if ('Sem fio' in section or 'Wi-Fi' in section) and '*' not in section:
+                        match = re.search(mac_pattern, section)
+                        if match:
+                            return match.group(0).replace('-', ':').upper()
+            except Exception as e:
+                print(f"Error getting MAC address on Windows: {e}")
+        else:
+            try:
+                output = subprocess.check_output(["ifconfig"], encoding="utf-8", errors="ignore")
+                lines = output.splitlines()
+            
+                in_en0 = False
+                for line in lines:
+                    line = line.strip().replace("ether ", "")
+                    if line.startswith("en0:"):
+                        in_en0 = True
+                    elif in_en0:
+                        match = re.search(mac_pattern, line, re.IGNORECASE)
+                        if match:
+                            return match.group(1).upper()
+                        if ":" in line and not line.startswith(" "):
+                            in_en0 = False
+            except Exception as e:
+                print(f"Error getting MAC address on Linux: {e}")
 
-            for section in sections:
-                if 'Sem fio' in section or 'Wi-Fi' in section and not '*' in section:
-                    match = re.search(mac_pattern, section)
-                    if match:
-                       return match.group(1).replace('-', ':').upper()
-
-
+    else:
         # Remote ip mac address
         output = subprocess.check_output(["arp", "-a"], encoding="utf-8", errors="ignore")
-        lines = output.split("\n")
+        lines = output.splitlines()
 
-        for line in lines:
-            if ip in line:
-                match = re.search(mac_pattern, line)
-                if match:
-                    return match.group(1).replace('-', ':').upper()
-
-    except Exception as e:
-        print(f"Erro ao obter o MAC: {e}")
-        return None
+        if platform.system().lower() == "windows":
+            try:
+                for line in lines:
+                    if ip in line:
+                        match = re.search(mac_pattern, line)
+                        if match:
+                            return match.group(1).replace('-', ':').upper()
+            except Exception as e:
+                print(f"Error getting MAC address for {ip} on Windows: {e}")
+        else:
+            try:
+                ip_pattern = rf"\? \({ip}\)"
+                for line in lines:
+                    if re.search(ip_pattern, line):
+                        match = re.search(mac_pattern, line)
+                        if match:
+                            return match.group(1).upper()
+            except Exception as e:
+                print(f"Error getting MAC address for {ip} on Linux: {e}")

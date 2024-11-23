@@ -2,6 +2,7 @@ import socket
 import struct
 import time
 import select
+import platform
 
 from checksum import checksum
 from e1.ip import create_ip_header
@@ -21,8 +22,14 @@ def create_icmp_packet(identifier):
 def send_ping(sock, src_addr, dest_addr, identifier):
     """Send an ICMP packet"""
     icmp_packet = create_icmp_packet(identifier)
-    ip_header = create_ip_header(src_addr, dest_addr)
-    packet = ip_header + icmp_packet
+
+    if platform.system().lower() == 'windows':
+        ip_header = create_ip_header(src_addr, dest_addr)
+        packet = ip_header + icmp_packet
+        sock.sendto(packet, (dest_addr, 0))
+        return
+
+    packet = icmp_packet
     sock.sendto(packet, (dest_addr, 0))
 
 
