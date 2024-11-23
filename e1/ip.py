@@ -7,7 +7,7 @@ def create_ip_header(src_addr, dest_addr):
     ip_ihl = 5
     ip_ver = 4
     ip_tos = 0
-    ip_tot_len = 20 + 8  # IP Header + ICMP Header
+    ip_tot_len = 20 + 8 + len(b"Ping!")  # IP Header + ICMP Header
     ip_id = 54321
     ip_frag_off = 0
     ip_ttl = 255
