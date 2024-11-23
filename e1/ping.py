@@ -5,13 +5,14 @@ import platform
 
 from e1.icmp import send_ping, receive_ping
 
+ETH_P_ALL = 0x0003
 
 def ping(dest_addr):
     """Main function to send and receive ICMP packets"""
     try:
         if (platform.system().lower() == 'linux'):
             sock = socket.socket(
-                socket.AF_PACKET, socket.SOCK_RAW, socket.htons(socket.ETH_P_ALL))
+                socket.AF_PACKET, socket.SOCK_RAW, socket.htons(ETH_P_ALL))
 
         elif (platform.system().lower() == 'windows'):
             sock = socket.socket(
