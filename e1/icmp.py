@@ -24,7 +24,6 @@ def create_icmp_packet(identifier):
 def send_ping(sock, src_addr, dest_addr, identifier):
     """Send an ICMP packet"""
     icmp_packet = create_icmp_packet(identifier)
-    print(platform.system().lower())
     if platform.system().lower() == 'windows' or platform.system().lower() == 'linux':
         ip_header = create_ip_header(src_addr, dest_addr)
         packet = ip_header + icmp_packet
