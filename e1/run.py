@@ -7,17 +7,18 @@ from e1.ping import ping_host
 from e1.cli_utils import get_ips_by_input
 from util import get_local_ip
 
+
 def find_network_hosts():
     if len(sys.argv) < 2 or not sys.argv[1].count('/'):
-       print("Usage: python main.py <network>")
-       print("Example: python main.py 192.168.1.0/24")
-       sys.exit(1)
-       return
-     
+        print("Usage: python main.py <network>")
+        print("Example: python main.py 192.168.1.0/24")
+        sys.exit(1)
+        return
+
     source_ip = get_local_ip()
 
-    network_ips = get_ips_by_input(sys.argv[1])
-    #network_ips = ['192.168.0.1']
+    # network_ips = get_ips_by_input(sys.argv[1])
+    network_ips = ['192.168.0.1']
 
     print("\n            Active hosts scan")
     print("=========================================")
@@ -44,4 +45,3 @@ def find_network_hosts():
     #     print(f"IP: {ip} - Delay: {delay:.2f}ms")
 
     return list(icmp_results.keys())
-    
