@@ -53,8 +53,8 @@ def receive_ping(sock, identifier, dest_addr, timeout=1):
         if not ready[0]:
             return None
 
+        response = sock.recv(1024)
         time_received = time.time()
-        response = sock.recv()
 
         print(response)
         return
