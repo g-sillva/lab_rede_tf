@@ -39,10 +39,10 @@ def ping(dest_addr):
 
     src_addr = get_local_ip()
     identifier = os.getpid() & 0xFFFF
-    send_ping(sock, src_addr, dest_addr, 1)
+    send_ping(sock, src_addr, dest_addr, identifier)
 
     start_time = time.time()
-    response = receive_ping(sock, 1, dest_addr)
+    response = receive_ping(sock, identifier, dest_addr)
     sock.close()
 
     if response:
