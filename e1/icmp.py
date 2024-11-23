@@ -56,7 +56,26 @@ def receive_ping(sock, identifier, dest_addr, timeout=1):
         response = sock.recv(1024)
         time_received = time.time()
 
-        print(response)
+        eth_type = struct.unpack("!H", response[12:14])[0]
+        if eth_type != 0x0800:  # IPv4
+            continue
+
+            # Verifica o cabeçalho IP
+        ip_header = response[14:34]
+        src_ip = socket.inet_ntoa(ip_header[12:16])
+        dst_ip = socket.inet_ntoa(ip_header[16:20])
+
+        print(src_ip, dst_ip)
+
+        # # Verifica o cabeçalho ICMP
+        # icmp_header = response[34:42]
+        # icmp_type, icmp_code = struct.unpack("!BB", icmp_header[:2])
+        # if icmp_type == 0 and icmp_code == 0:  # Echo Reply
+        #     with lock:
+        #         activeDevices.append(
+        #             {"ip": target_ip, "responseTime": (recv_time - send_time) * 1000})
+        #     break
+        # print(response)
         return
         # # if addr[0] != dest_addr:
         # #     continue
