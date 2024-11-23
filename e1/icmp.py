@@ -56,7 +56,7 @@ def receive_ping(sock, identifier, dest_addr, timeout=1):
         time_received = time.time()
         packet, addr = sock.recvfrom(1024)
 
-        print(packet, addr, dest_addr)
+        print('aaaaaaaaaaaa ' + addr)
         if addr[0] != dest_addr:
             continue
 
