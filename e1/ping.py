@@ -37,7 +37,7 @@ def ping(dest_addr):
 
     src_addr = get_local_ip()
     identifier = os.getpid() & 0xFFFF
-    send_ping(sock, src_addr, dest_addr, identifier)
+    send_ping(sock, src_addr, dest_addr, 1)
 
     start_time = time.time()
     response = receive_ping(sock, identifier, dest_addr)

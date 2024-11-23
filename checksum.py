@@ -1,21 +1,13 @@
 def checksum(source_string):
     """Calcula o checksum do cabeçalho"""
-    sum = 0
-    count_to = (len(source_string) // 2) * 2
-    count = 0
-    while count < count_to:
-        this_val = source_string[count + 1] * 256 + source_string[count]
-        sum = sum + this_val
-        sum = sum & 0xffffffff
-        count = count + 2
+    checksum = 0
+    if len(source_string) % 2 != 0:
+        source_string += b'\x00'
 
-    if count_to < len(source_string):
-        sum = sum + source_string[-1]
-        sum = sum & 0xffffffff
+    for i in range(0, len(source_string), 2):
+        word = (source_string[i] << 8) + source_string[i + 1]
+        checksum += word
 
-    sum = (sum >> 16) + (sum & 0xffff)
-    sum = sum + (sum >> 16)
-    answer = ~sum
-    answer = answer & 0xffff
-    answer = answer >> 8 | (answer << 8 & 0xff00)
-    return answer
+    checksum = (checksum >> 16) + (checksum & 0xffff)
+    checksum += (checksum >> 16)
+    return ~checksum & 0xffff

@@ -18,7 +18,7 @@ def create_icmp_packet(identifier):
     data = b'Ping!'
     checksum_value = checksum(header + data)
     header = struct.pack("bbHHh", ICMP_ECHO_REQUEST, 0,
-                         socket.htons(checksum_value), identifier, 1)
+                         checksum_value, identifier, 1)
     return header + data
 
 
