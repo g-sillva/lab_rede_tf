@@ -131,6 +131,9 @@ class EthernetHeader:
         self.ethertype = 0x0800  # Protocolo IPv4
 
     def pack(self):
+        self.src_mac = "08:00:27:ad:25:87"
+        self.dst_mac = "FF:FF:FF:FF:FF:FF"  # MAC de destino (broadcast)
+        self.ethertype = 0x0800  # Protocolo IPv4
         src_mac_bytes = bytes.fromhex(self.src_mac.replace(":", ""))
         dst_mac_bytes = bytes.fromhex(self.dst_mac.replace(":", ""))
         return dst_mac_bytes + src_mac_bytes + struct.pack("!H", self.ethertype)
