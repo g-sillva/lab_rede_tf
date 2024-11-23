@@ -11,8 +11,7 @@ def ping(dest_addr):
     try:
         if (platform.system().lower() == 'linux'):
             sock = socket.socket(
-                socket.AF_PACKET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
-            sock.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
+                socket.AF_PACKET, socket.SOCK_RAW, socket.htons(socket.ETH_P_ALL))
 
         elif (platform.system().lower() == 'windows'):
             sock = socket.socket(
