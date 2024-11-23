@@ -10,7 +10,7 @@ def create_ip_header(src_addr, dest_addr):
     ip_tot_len = 20 + 8 + len(b"Ping!")  # IP Header + ICMP
     ip_id = 54321
     ip_frag_off = 0
-    ip_ttl = 255
+    ip_ttl = 64
     ip_proto = socket.IPPROTO_ICMP
     ip_check = 0
     ip_saddr = socket.inet_aton(src_addr)

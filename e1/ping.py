@@ -18,18 +18,18 @@ def get_local_ip():
 def ping(dest_addr):
     """Main function to send and receive ICMP packets"""
     try:
-        if (platform.system().lower() == 'linux'):
-            sock = socket.socket(
-                socket.AF_PACKET, socket.SOCK_RAW, socket.htons(3))
-            sock.bind(('eth0', 0))
+        # if (platform.system().lower() == 'linux'):
+        #     sock = socket.socket(
+        #         socket.AF_PACKET, socket.SOCK_RAW, socket.htons(3))
+        #     sock.bind(('eth0', 0))
 
-        elif (platform.system().lower() == 'windows'):
+        # elif (platform.system().lower() == 'windows'):
             sock = socket.socket(
                 socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
             sock.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
-        else:
-            sock = socket.socket(
-                socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
+        # else:
+        #     sock = socket.socket(
+        #         socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
 
     except PermissionError:
         print("Permission denied. Try running as root.")
