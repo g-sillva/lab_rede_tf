@@ -13,6 +13,7 @@ def ping(dest_addr):
         if (platform.system().lower() == 'linux'):
             sock = socket.socket(
                 socket.AF_PACKET, socket.SOCK_RAW, socket.htons(ETH_P_ALL))
+            sock.bind(('eth0', 0))
 
         elif (platform.system().lower() == 'windows'):
             sock = socket.socket(
