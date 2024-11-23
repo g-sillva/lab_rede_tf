@@ -124,15 +124,13 @@ def calculate_checksum(data):
 
 
 class EthernetHeader:
-    def _init_(self):
+    def __init__(self):
         # MAC de origem (ajuste conforme necessário)
         self.src_mac = "08:00:27:ad:25:87"
         self.dst_mac = "FF:FF:FF:FF:FF:FF"  # MAC de destino (broadcast)
         self.ethertype = 0x0800  # Protocolo IPv4
 
     def pack(self):
-        self.src_mac = "08:00:27:ad:25:87"
-        self.dst_mac = "FF:FF:FF:FF:FF:FF"  # MAC de destino (broadcast)
         self.ethertype = 0x0800  # Protocolo IPv4
         src_mac_bytes = bytes.fromhex(self.src_mac.replace(":", ""))
         dst_mac_bytes = bytes.fromhex(self.dst_mac.replace(":", ""))
@@ -140,7 +138,7 @@ class EthernetHeader:
 
 
 class IpHeader:
-    def _init_(self, src_ip, dst_ip, ttl=64):
+    def __init__(self, src_ip, dst_ip, ttl=64):
         self.version = 4
         self.ihl = 5
         self.tos = 0
