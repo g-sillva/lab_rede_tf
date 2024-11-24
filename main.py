@@ -2,8 +2,8 @@ import sys
 import socket
 
 from e1.run import find_network_hosts
-from e2.run import run_arp_spoofing
-from e2.arp import get_mac_address
+from e2.arp import perform_arp_spoof
+
 
 def select_target_host(hosts):
     print("\nSelect the target host to perform the attack:")
@@ -34,6 +34,7 @@ def select_target_host(hosts):
 
     return target_host
 
+
 def main():
 
     ########## 1 ##########
@@ -49,9 +50,8 @@ def main():
 
     print(f"\nTarget host: {target_host}")
 
-
     ########## 2 ##########
-    run_arp_spoofing(target_host)
+    perform_arp_spoof(target_host)
 
 
 if __name__ == '__main__':

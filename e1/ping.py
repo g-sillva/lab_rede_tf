@@ -17,6 +17,22 @@ def get_local_ip():
     return local_ip
 
 
+
+def get_host_ip():
+    """
+    Returns the host's IP address associated with the active network interface.
+    """
+    try:
+        # Use a UDP socket to connect to a non-routable IP (to avoid sending actual packets)
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))  # Google Public DNS server
+            ip_address = s.getsockname()[0]
+        return ip_address
+    except Exception as e:
+        print(f"[!] Failed to get host IP: {e}")
+        return None
+
+
 def ping(dest_addr):
     """Main function to send and receive ICMP packets."""
     try:
@@ -67,6 +83,7 @@ def ping(dest_addr):
     except Exception as e:
         sock.close()
         return False
+
 
 
 def ping_host(ip):

