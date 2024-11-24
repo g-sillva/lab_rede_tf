@@ -3,6 +3,20 @@ import struct
 import datetime
 from html import escape
 
+def generate_html_log(entries):
+  """Generate HTML log file."""
+  with open("web_history.html", "w") as f:
+      f.write("<html><head><title>Lab Redes - TF</title></head>")
+      f.write("<style> * { box-sizing: border-box; padding: 0; margin: 0; font-family: Arial, sans-serif } h1 { margin: 20px 0; font-weight: 400; font-size: 18px; text-align: center; } table { width: 80%; border-collapse: collapse; margin: 20px auto; } tr > th { background-color: #191621; color: #fff; overflow: hidden; font-size: 14px; letter-spacing: 1px; font-weight: 500; } tr > th:first-child { border-top-left-radius: 10px; } tr > th:last-child { border-top-right-radius: 10px; } th, td { padding: 15px; font-size: 14px; text-align: left; color: #3d3d3d; } tr:nth-child(odd) { background-color: #F5F5F5; }</style>")
+      f.write("<body><h1>Monitoramento</h1><table>")
+      f.write("<tr><th>Data</th><th>IP</th><th>Host</th><th>URL</th></tr>")
+      for entry in entries:
+          f.write(f"<tr><td>{escape(entry['date'])}</td>")
+          f.write(f"<td>{escape(entry['ip'])}</td>")
+          f.write(f"<td>{escape(entry['host'])}</td>")
+          f.write(f"<td>{escape(entry['url'])}</td></tr>")
+      f.write("</table></body></html>")
+
 
 def parse_ethernet_header(packet):
     """Parse Ethernet header."""
@@ -55,55 +69,48 @@ def parse_http(packet):
                     parts = line.split(" ")
                     if len(parts) > 1:
                         path = parts[1]
-            if host:
-                print(host, path)
+            if host and '.' in host:
                 return host, path
     except Exception:
         return None
 
-def parse_sni(packet):
-    """Parse SNI in HTTPS (SSL/TLS handshake)."""
-    ssl_data = packet[54:]
-    if len(ssl_data) < 5:
+def parse_tls_sni(packet):
+    """Parse SNI from a TLS handshake packet."""
+    try:
+        tls_handshake_start = 66
+        
+        if len(packet) < tls_handshake_start + 5:
+            return None
+        
+        handshake_type = packet[tls_handshake_start + 5]  
+
+        if handshake_type == 0x01:  # Client Hello
+            extensions_offset = tls_handshake_start + 43
+
+            while extensions_offset < len(packet) - 4:
+                extension_type = struct.unpack("!H", packet[extensions_offset:extensions_offset + 2])[0]
+
+                if extension_type == 0x00:  # Extensão SNI
+                    sni_length = struct.unpack("!H", packet[extensions_offset + 4:extensions_offset + 6])[0]
+                    sni_bytes = packet[extensions_offset + 6:extensions_offset + 6 + sni_length]
+
+                    sni = sni_bytes.decode('utf-8', errors='ignore')
+
+                    # Check if the SNI is a domain name
+                    if not ".com" in sni and not ".net" in sni:
+                        return None
+
+                    # Clean up the SNI
+                    sni = sni.strip().rstrip('\x00')
+
+                    if sni:
+                        return sni
+                else:
+                    extensions_offset += 1
+        
+    except Exception as e:
+        print(f"Error parsing TLS SNI: {e}")
         return None
-
-    if ssl_data[0] == 0x16:  # Handshake type (0x16 = Client Hello)
-        print('Handshake!!!')
-
-        handshake_data = ssl_data[5:]
-
-        handshake_length = struct.unpack("!H", handshake_data[:2])[0]
-        handshake_data = handshake_data[2:]
-
-        if len(handshake_data) >= handshake_length:
-            extensions_offset = 43  # This is a fixed offset for SNI in most handshakes
-            if len(handshake_data) > extensions_offset:
-                extensions_data = handshake_data[extensions_offset:]
-
-                i = 0
-                while i < len(extensions_data):
-                    extension_type = struct.unpack("!H", extensions_data[i:i+2])[0]
-                    extension_length = struct.unpack("!H", extensions_data[i+2:i+4])[0]
-
-                    if extension_type == 0x00:  # SNI extension type
-                        sni_name = extensions_data[i + 4:i + 4 + extension_length].decode(errors='ignore')
-                        return sni_name
-                    i += 4 + extension_length
-    return None
-
-
-def generate_html_log(entries):
-    """Generate HTML log file."""
-    with open("web_history.html", "w") as f:
-        f.write("<html><head><title>Web History</title></head><body>")
-        f.write("<h1>Web History Log</h1><table border='1'>")
-        f.write("<tr><th>Date</th><th>IP</th><th>Host</th><th>URL</th></tr>")
-        for entry in entries:
-            f.write(f"<tr><td>{escape(entry['date'])}</td>")
-            f.write(f"<td>{escape(entry['ip'])}</td>")
-            f.write(f"<td>{escape(entry['host'])}</td>")
-            f.write(f"<td>{escape(entry['url'])}</td></tr>")
-        f.write("</table></body></html>")
 
 
 def sniff(target_host):
@@ -112,6 +119,7 @@ def sniff(target_host):
         socket.PF_PACKET, socket.SOCK_RAW, socket.ntohs(0x0003))
     entries = []
     try:
+        print('[*] Starting sniffing...')
         while True:
             packet = sniffer.recvfrom(65565)[0]
             eth_protocol = parse_ethernet_header(packet)
@@ -134,9 +142,9 @@ def sniff(target_host):
                         })
 
                 elif protocol == 6:  # TCP (HTTP/HTTPS)
-                    # If the packet is on port 80, it's HTTP
                     dest_port = struct.unpack("!H", packet[36:38])[0]
-                    if dest_port == 80:
+
+                    if dest_port == 80: # HTTP
                         result = parse_http(packet)
                         if result:
                             host, path = result
@@ -146,11 +154,10 @@ def sniff(target_host):
                                 "host": host,
                                 "url": f"http://{host}{path}"
                             })
-                    # If the packet is on port 443, it's HTTPS
-                    elif dest_port == 443:
-                        sni = parse_sni(packet)
+
+                    elif dest_port == 443: # HTTPS
+                        sni = parse_tls_sni(packet)
                         if sni:
-                            print(sni)
                             entries.append({
                                 "date": str(datetime.datetime.now()),
                                 "ip": src_ip,
@@ -163,7 +170,3 @@ def sniff(target_host):
     except KeyboardInterrupt:
         print("Stopping sniffing...")
         generate_html_log(entries)
-
-
-if __name__ == "__main__":
-    sniff('192.168.0.169')

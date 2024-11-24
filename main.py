@@ -54,9 +54,7 @@ def main():
     perform_arp_spoof(target_host)
 
     ########## 3 ##########
-    data = sniff()
-
-    # export_to_html(data)
+    sniff(target_host)
 
 
 if __name__ == '__main__':
