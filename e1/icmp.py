@@ -10,12 +10,14 @@ from e1.ip import create_ip_header
 ICMP_ECHO_REQUEST = 8
 ICMP_ECHO_REPLY = 0
 
+
 def create_icmp_packet(identifier):
     """Create an ICMP packet"""
     header = struct.pack("bbHHh", ICMP_ECHO_REQUEST, 0, 0, identifier, 1)
     data = b'Ping!' + (192 * b'Q')
     checksum_value = checksum(header + data)
-    header = struct.pack("bbHHh", ICMP_ECHO_REQUEST, 0, socket.htons(checksum_value), identifier, 1)
+    header = struct.pack("bbHHh", ICMP_ECHO_REQUEST, 0,
+                         socket.htons(checksum_value), identifier, 1)
     return header + data
 
 
@@ -23,7 +25,7 @@ def send_ping(sock, src_addr, dest_addr, identifier):
     """Send an ICMP packet"""
     icmp_packet = create_icmp_packet(identifier)
 
-    if platform.system().lower() == 'windows':
+    if platform.system().lower() == 'windows' or platform.system().lower() == 'linux':
         ip_header = create_ip_header(src_addr, dest_addr)
         packet = ip_header + icmp_packet
         sock.sendto(packet, (dest_addr, 0))
