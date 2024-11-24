@@ -1,20 +1,34 @@
 import socket
 import os
-import time
 import platform
+import subprocess
 
 from e1.icmp import send_ping, receive_ping
 
 
 def get_local_ip():
-    """Get the local IP address of the machine"""
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-        try:
+    """Get the local IP address of the machine."""
+    try:
+        # Attempt to get IP using a dummy UDP connection
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.connect(("8.8.8.8", 80))
-            local_ip = s.getsockname()[0]
-        except Exception:
-            local_ip = "127.0.0.1"
-    return local_ip
+            return s.getsockname()[0]
+    except Exception:
+        pass
+
+    # Fallback: Use the system's default route to determine the IP
+    try:
+        result = subprocess.check_output(
+            ["ip", "route", "get", "1.1.1.1"], encoding="utf-8"
+        )
+        for line in result.splitlines():
+            if "src" in line:
+                return line.split("src")[1].strip().split()[0]
+    except Exception:
+        pass
+
+    # Final fallback: Loopback address if all else fails
+    return "127.0.0.1"
 
 
 def ping(dest_addr):
