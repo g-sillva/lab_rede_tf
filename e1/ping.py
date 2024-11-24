@@ -39,11 +39,11 @@ def ping(dest_addr):
         return False
 
     src_addr = get_local_ip()
-    print(src_addr)
+    print(dest_addr)
     identifier = os.getpid() & 0xFFFF
     send_ping(sock, src_addr, dest_addr, identifier)
-    sock.settimeout(3)
-    try:       
+    sock.settimeout(1)
+    try:
         while True:
             response = sock.recv(1024)
             recv_time = time.time()
@@ -68,12 +68,14 @@ def ping(dest_addr):
                 sock.close()
                 return True
     except socket.timeout:
+        print(f'timeout {dest_addr}')
         sock.close()
         return False
     except Exception as e:
         print(e)
         sock.close()
         return False
+
 
 def ping_host(ip):
     """Wrapper function to ping a host"""
