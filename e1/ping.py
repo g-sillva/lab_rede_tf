@@ -38,6 +38,7 @@ def ping(dest_addr):
         return False
 
     src_addr = get_local_ip()
+    print(src_addr)
     identifier = os.getpid() & 0xFFFF
     send_ping(sock, src_addr, dest_addr, identifier)
 
