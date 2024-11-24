@@ -1,10 +1,9 @@
 import socket
 import os
 import platform
-import time
 import struct
 
-from e1.icmp import send_ping, receive_ping
+from e1.icmp import send_ping
 
 
 def get_local_ip():

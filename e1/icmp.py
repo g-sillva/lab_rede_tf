@@ -1,7 +1,4 @@
-import socket
 import struct
-import time
-import select
 import platform
 
 from checksum import checksum
