@@ -11,7 +11,6 @@ def run_arp_spoofing(target_ip):
     
     source_ip = socket.gethostbyname(socket.gethostname())
     source_mac = get_mac_address()
-    print(source_mac)
 
     target_mac = get_mac_address(ip=target_ip)
     

@@ -1,8 +1,8 @@
 import sys
-import socket
 
 from e1.run import find_network_hosts
 from e2.arp import perform_arp_spoof
+from e3.sniifer import sniff
 
 
 def select_target_host(hosts):
@@ -52,6 +52,9 @@ def main():
 
     ########## 2 ##########
     perform_arp_spoof(target_host)
+
+    ########## 3 ##########
+    sniff(target_host)
 
 
 if __name__ == '__main__':
