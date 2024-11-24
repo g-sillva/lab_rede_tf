@@ -39,21 +39,17 @@ def ping(dest_addr):
         return False
 
     src_addr = get_local_ip()
-    print(dest_addr)
     identifier = os.getpid() & 0xFFFF
     send_ping(sock, src_addr, dest_addr, identifier)
     sock.settimeout(1)
+
     try:
         while True:
             response = sock.recv(1024)
-            recv_time = time.time()
-
-            # Verifica se o pacote recebido é ICMP
             eth_type = struct.unpack("!H", response[12:14])[0]
-            if eth_type != 0x0800:  # IPv4
+            if eth_type != 0x0800:
                 continue
 
-            # Verifica o cabeçalho IP
             ip_header = response[14:34]
             src_ip = socket.inet_ntoa(ip_header[12:16])
             dst_ip = socket.inet_ntoa(ip_header[16:20])
@@ -61,18 +57,15 @@ def ping(dest_addr):
             if src_ip != dest_addr or dst_ip != src_addr:
                 continue
 
-            # Verifica o cabeçalho ICMP
             icmp_header = response[34:42]
             icmp_type, icmp_code = struct.unpack("!BB", icmp_header[:2])
-            if icmp_type == 0 and icmp_code == 0:  # Echo Reply
+            if icmp_type == 0 and icmp_code == 0:
                 sock.close()
                 return True
     except socket.timeout:
-        print(f'timeout {dest_addr}')
         sock.close()
         return False
     except Exception as e:
-        print(e)
         sock.close()
         return False
 
