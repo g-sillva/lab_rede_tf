@@ -43,7 +43,7 @@ def send_ping(sock, src_addr, dest_addr, identifier):
     sock.sendto(packet, (dest_addr, 0))
 
 
-def receive_ping(sock, identifier, dest_addr, timeout=1):
+def receive_ping(sock, identifier, dest_addr, timeout=2):
     """Receive an ICMP packet"""
     time_left = timeout
     while True:
