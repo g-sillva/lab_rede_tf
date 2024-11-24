@@ -18,7 +18,6 @@ def find_network_hosts():
     source_ip = get_local_ip()
 
     network_ips = get_ips_by_input(sys.argv[1])
-    # network_ips = ['192.168.0.1']
 
     print("\n            Active hosts scan")
     print("=========================================")
@@ -33,15 +32,14 @@ def find_network_hosts():
 
         for future in as_completed(futures):
             ip, ping_response = future.result()
-            if ping_response and ip != source_ip:
+            if ping_response != -1 and ip != source_ip:
                 icmp_results[ip] = ping_response
 
     if not icmp_results:
         return []
 
-    # Debug print
-    # print("\nFound IPs with ICMP response:")
-    # for ip, delay in icmp_results.items():
-    #     print(f"IP: {ip} - Delay: {delay:.2f}ms")
+    print("\nFound IPs with ICMP response:")
+    for ip, delay in icmp_results.items():
+        print(f"IP: {ip} - Delay: {delay:.2f}ms")
 
     return list(icmp_results.keys())

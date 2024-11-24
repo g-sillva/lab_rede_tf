@@ -2,6 +2,7 @@ import socket
 import os
 import platform
 import struct
+import time
 
 from e1.icmp import send_ping
 
@@ -15,7 +16,6 @@ def get_local_ip():
         except Exception:
             local_ip = "127.0.0.1"
     return local_ip
-
 
 
 def get_host_ip():
@@ -55,7 +55,9 @@ def ping(dest_addr):
 
     src_addr = get_local_ip()
     identifier = os.getpid() & 0xFFFF
+
     send_ping(sock, src_addr, dest_addr, identifier)
+    start_time = time.time()
     sock.settimeout(1)
 
     try:
@@ -75,15 +77,16 @@ def ping(dest_addr):
             icmp_header = response[34:42]
             icmp_type, icmp_code = struct.unpack("!BB", icmp_header[:2])
             if icmp_type == 0 and icmp_code == 0:
+                end_time = time.time()
+                elapsed_time = (end_time - start_time) * 1000
                 sock.close()
-                return True
+                return elapsed_time
     except socket.timeout:
         sock.close()
-        return False
+        return -1
     except Exception as e:
         sock.close()
-        return False
-
+        return -1
 
 
 def ping_host(ip):

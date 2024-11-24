@@ -39,7 +39,7 @@ def main():
 
     ########## 1 ##########
     hosts = find_network_hosts()
-    print(hosts)
+
     if len(hosts) == 0:
         print("Error: No active hosts found in the network")
         return
