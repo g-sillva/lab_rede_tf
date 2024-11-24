@@ -43,34 +43,28 @@ def send_ping(sock, src_addr, dest_addr, identifier):
     sock.sendto(packet, (dest_addr, 0))
 
 
-def receive_ping(sock, identifier, dest_addr, timeout=2):
-    """Receive an ICMP reply packet."""
+def receive_ping(sock, identifier, dest_addr, timeout=1):
+    """Receive an ICMP packet"""
     time_left = timeout
-    while time_left > 0:
+    while True:
         start_time = time.time()
         ready = select.select([sock], [], [], time_left)
-        elapsed = time.time() - start_time
+        time_spent = (time.time() - start_time)
         if not ready[0]:
-            break
+            return None
 
         time_received = time.time()
         packet, addr = sock.recvfrom(1024)
 
-        # Ignore packets from unexpected sources
         if addr[0] != dest_addr:
             continue
 
-        # Extract the ICMP header (starting at byte 20 in an IP packet)
         icmp_header = packet[20:28]
-        icmp_type, code, checksum, packet_id, sequence = struct.unpack(
-            "bbHHh", icmp_header)
+        icmp_type, _, _, packet_id, _ = struct.unpack("bbHHh", icmp_header)
 
-        # Check if it is an ICMP Echo Reply and matches the identifier
         if icmp_type == ICMP_ECHO_REPLY and packet_id == identifier:
-            print(f"[*] Received ICMP reply from {dest_addr}")
-            return True
+            return time_received
 
-        time_left -= elapsed
-
-    print(f"[!] No reply received from {dest_addr}")
-    return False
+        time_left = time_left - time_spent
+        if time_left <= 0:
+            return None
