@@ -33,7 +33,7 @@ def find_network_hosts():
 
         for future in as_completed(futures):
             ip, ping_response = future.result()
-            if ping_response is not None and ip != source_ip:
+            if ping_response and ip != source_ip:
                 icmp_results[ip] = ping_response
 
     if not icmp_results:
