@@ -47,16 +47,17 @@ def receive_ping(sock, identifier, dest_addr, timeout=1):
 
         time_received = time.time()
         packet, addr = sock.recvfrom(1024)
-
+        print(addr[0], dest_addr)
         if addr[0] != dest_addr:
             continue
 
         icmp_header = packet[20:28]
         icmp_type, _, _, packet_id, _ = struct.unpack("bbHHh", icmp_header)
-
+        print(icmp_type, ICMP_ECHO_REPLY, packet_id, identifier)
         if icmp_type == ICMP_ECHO_REPLY and packet_id == identifier:
             return time_received
 
         time_left = time_left - time_spent
+        print(time_left)
         if time_left <= 0:
             return None
