@@ -46,11 +46,50 @@ def parse_http(packet):
         http_payload = http_data.decode(errors="ignore")
         if "Host:" in http_payload:
             lines = http_payload.split("\r\n")
+            host = None
+            path = None
             for line in lines:
                 if line.startswith("Host:"):
-                    return line.split(":")[1].strip()
+                    host = line.split(":")[1].strip()
+                elif "GET" in line or "POST" in line:
+                    parts = line.split(" ")
+                    if len(parts) > 1:
+                        path = parts[1]
+            if host:
+                print(host, path)
+                return host, path
     except Exception:
         return None
+
+def parse_sni(packet):
+    """Parse SNI in HTTPS (SSL/TLS handshake)."""
+    ssl_data = packet[54:]
+    if len(ssl_data) < 5:
+        return None
+
+    if ssl_data[0] == 0x16:  # Handshake type (0x16 = Client Hello)
+        print('Handshake!!!')
+
+        handshake_data = ssl_data[5:]
+
+        handshake_length = struct.unpack("!H", handshake_data[:2])[0]
+        handshake_data = handshake_data[2:]
+
+        if len(handshake_data) >= handshake_length:
+            extensions_offset = 43  # This is a fixed offset for SNI in most handshakes
+            if len(handshake_data) > extensions_offset:
+                extensions_data = handshake_data[extensions_offset:]
+
+                i = 0
+                while i < len(extensions_data):
+                    extension_type = struct.unpack("!H", extensions_data[i:i+2])[0]
+                    extension_length = struct.unpack("!H", extensions_data[i+2:i+4])[0]
+
+                    if extension_type == 0x00:  # SNI extension type
+                        sni_name = extensions_data[i + 4:i + 4 + extension_length].decode(errors='ignore')
+                        return sni_name
+                    i += 4 + extension_length
+    return None
 
 
 def generate_html_log(entries):
@@ -67,8 +106,8 @@ def generate_html_log(entries):
         f.write("</table></body></html>")
 
 
-def sniff():
-    """Sniff packets and analyze DNS/HTTP."""
+def sniff(target_host):
+    """Sniff packets and analyze DNS/HTTP/HTTPS."""
     sniffer = socket.socket(
         socket.PF_PACKET, socket.SOCK_RAW, socket.ntohs(0x0003))
     entries = []
@@ -78,8 +117,11 @@ def sniff():
             eth_protocol = parse_ethernet_header(packet)
 
             # Process only IPv4
-            if eth_protocol == 0x0800:
+            if eth_protocol == 8:
                 protocol, src_ip, dest_ip = parse_ip_header(packet)
+
+                if src_ip != target_host:
+                    continue
 
                 if protocol == 17:  # UDP (DNS)
                     query = parse_dns(packet)
@@ -91,22 +133,37 @@ def sniff():
                             "url": query
                         })
 
-                elif protocol == 6:  # TCP (HTTP)
-                    host = parse_http(packet)
-                    if host:
-                        entries.append({
-                            "date": str(datetime.datetime.now()),
-                            "ip": src_ip,
-                            "host": host,
-                            "url": f"http://{host}"
-                        })
+                elif protocol == 6:  # TCP (HTTP/HTTPS)
+                    # If the packet is on port 80, it's HTTP
+                    dest_port = struct.unpack("!H", packet[36:38])[0]
+                    if dest_port == 80:
+                        result = parse_http(packet)
+                        if result:
+                            host, path = result
+                            entries.append({
+                                "date": str(datetime.datetime.now()),
+                                "ip": src_ip,
+                                "host": host,
+                                "url": f"http://{host}{path}"
+                            })
+                    # If the packet is on port 443, it's HTTPS
+                    elif dest_port == 443:
+                        sni = parse_sni(packet)
+                        if sni:
+                            print(sni)
+                            entries.append({
+                                "date": str(datetime.datetime.now()),
+                                "ip": src_ip,
+                                "host": sni,
+                                "url": f"https://{sni}"
+                            })
 
-                if len(entries) % 10 == 0:  # Save periodically
-                    generate_html_log(entries)
+                generate_html_log(entries)
+
     except KeyboardInterrupt:
         print("Stopping sniffing...")
         generate_html_log(entries)
 
 
 if __name__ == "__main__":
-    sniff()
+    sniff('192.168.0.169')

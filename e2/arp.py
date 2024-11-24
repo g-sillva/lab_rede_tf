@@ -1,6 +1,7 @@
 import subprocess
 import threading
 import os
+import sys
 
 
 def enable_ip_forwarding():
@@ -15,6 +16,7 @@ def enable_ip_forwarding():
         print("[!] Permission denied. Run this script with elevated privileges (sudo).")
     except Exception as e:
         print(f"[!] Failed to enable IP forwarding: {e}")
+        sys.exit(1)
 
 
 def perform_arp_spoof(victim_ip, iface="eth0"):
@@ -56,3 +58,4 @@ def run_arpspoof(victim_ip, router_ip, iface="eth0", target_victim=True):
 
     except subprocess.CalledProcessError as e:
         print(f"[!] Failed to execute arpspoof: {e}")
+        sys.exit(1)
