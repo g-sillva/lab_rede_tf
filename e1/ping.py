@@ -18,37 +18,31 @@ def get_local_ip():
 
 
 def ping(dest_addr):
-    """Main function to send and receive ICMP packets"""
+    """Main function to send and receive ICMP packets."""
     try:
-        if (platform.system().lower() == 'linux'):
+        if platform.system().lower() == 'linux':
             sock = socket.socket(
-                socket.AF_PACKET, socket.SOCK_RAW, socket.htons(3))
-            sock.bind(('eth0', 0))
+                socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
 
-        elif (platform.system().lower() == 'windows'):
+        elif platform.system().lower() == 'windows':
             sock = socket.socket(
                 socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
             sock.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
+
         else:
-            sock = socket.socket(
-                socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
+            raise OSError("Unsupported platform")
 
     except PermissionError:
-        print("Permission denied. Try running as root.")
-        return None
+        print("Permission denied. Run the script with elevated privileges (sudo).")
+        return False
 
     src_addr = get_local_ip()
     identifier = os.getpid() & 0xFFFF
     send_ping(sock, src_addr, dest_addr, identifier)
 
-    start_time = time.time()
-    response = receive_ping(sock, identifier, dest_addr)
+    is_alive = receive_ping(sock, identifier, dest_addr)
     sock.close()
-
-    if response:
-        delay = (response - start_time) * 1000
-        return delay
-    return None
+    return is_alive
 
 
 def ping_host(ip):
