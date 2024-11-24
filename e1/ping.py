@@ -22,7 +22,8 @@ def ping(dest_addr):
     try:
         if platform.system().lower() == 'linux':
             sock = socket.socket(
-                socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
+                socket.AF_PACKET, socket.SOCK_RAW, socket.htons(3))
+            sock.bind(('eth0', 0))
 
         elif platform.system().lower() == 'windows':
             sock = socket.socket(
