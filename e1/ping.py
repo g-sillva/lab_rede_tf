@@ -41,14 +41,14 @@ def ping(dest_addr):
     identifier = os.getpid() & 0xFFFF
     send_ping(sock, src_addr, dest_addr, identifier)
 
-    # start_time = time.time()
-    # response = receive_ping(sock, identifier, dest_addr)
-    # sock.close()
+    start_time = time.time()
+    response = receive_ping(sock, identifier, dest_addr)
+    sock.close()
 
-    # if response:
-    #     delay = (response - start_time) * 1000
-    #     return delay
-    # return None
+    if response:
+        delay = (response - start_time) * 1000
+        return delay
+    return None
 
 
 def ping_host(ip):

@@ -53,41 +53,18 @@ def receive_ping(sock, identifier, dest_addr, timeout=1):
         if not ready[0]:
             return None
 
-        response = sock.recv(1024)
         time_received = time.time()
+        packet, addr = sock.recvfrom(1024)
 
-        eth_type = struct.unpack("!H", response[12:14])[0]
-        if eth_type != 0x0800:  # IPv4
+        if addr[0] != dest_addr:
             continue
 
-            # Verifica o cabeçalho IP
-        ip_header = response[14:34]
-        src_ip = socket.inet_ntoa(ip_header[12:16])
-        dst_ip = socket.inet_ntoa(ip_header[16:20])
+        icmp_header = packet[20:28]
+        icmp_type, _, _, packet_id, _ = struct.unpack("bbHHh", icmp_header)
 
-        print(src_ip, dst_ip)
+        if icmp_type == ICMP_ECHO_REPLY and packet_id == identifier:
+            return time_received
 
-        # # Verifica o cabeçalho ICMP
-        # icmp_header = response[34:42]
-        # icmp_type, icmp_code = struct.unpack("!BB", icmp_header[:2])
-        # if icmp_type == 0 and icmp_code == 0:  # Echo Reply
-        #     with lock:
-        #         activeDevices.append(
-        #             {"ip": target_ip, "responseTime": (recv_time - send_time) * 1000})
-        #     break
-        # print(response)
-        return
-        # # if addr[0] != dest_addr:
-        # #     continue
-
-        # # icmp_header = packet[20:28]
-        # icmp_type, _, _, packet_id, _ = struct.unpack("bbHHh", icmp_header)
-
-        # print(icmp_type, ICMP_ECHO_REPLY, packet_id, identifier)
-        # if icmp_type == ICMP_ECHO_REPLY and packet_id == identifier:
-        #     return time_received
-
-        # print(time_left, time_spent)
-        # time_left = time_left - time_spent
-        # if time_left <= 0:
-        #     return None
+        time_left = time_left - time_spent
+        if time_left <= 0:
+            return None
