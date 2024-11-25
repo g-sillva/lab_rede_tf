@@ -5,12 +5,17 @@ from html import escape
 
 def is_valid_domain(domain):
     """Check if a domain is valid."""
-    if not domain or len(domain) < 3 or not '.' in domain or 'api' in domain or '--' in domain or domain.startswith('_') or domain.startswith('#') or domain.startswith('(') or 'ssl.' in domain or 'api.' in domain or 'apis.' in domain:
+    if not domain or len(domain) < 3 or not '.' in domain or 'api' in domain or '-' in domain or domain.startswith('_') or domain.startswith('#') or domain.startswith('(') or 'ssl.' in domain or 'static.' in domain or '.xx.' in domain or 'gateway' in domain or 'www.' in domain or 'emoji' in domain or 'thumb' in domain or 'asset' in domain or 'preview' in domain or 'style' in domain or 'cdn' in domain or 'collector' in domain or 'services.' in domain or 'css' in domain or 'font' in domain or '.js' in domain:
         return False
     return True
 
+def get_current_date():
+    return datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
 def should_add_entry(entries, host=None, path=None):
-    # Adiciona se a url for diferente do último
+    if host is None and path is None:
+        return False
+
     if not entries:
         return True
     
@@ -74,7 +79,6 @@ def parse_http(packet):
             if is_valid_domain(host):
                 return host, path
             
-            print('HTTP')
             return host, path
     except Exception:
         return None
@@ -106,7 +110,11 @@ def parse_dns(packet):
             i += length + 1
         
         domain = domain[:-1]  # Remover o ponto final
-        return domain
+
+        if is_valid_domain(domain):
+            return domain
+        
+        return None
     
     return None
 
@@ -147,7 +155,7 @@ def sniff(target_host):
                                 path = "/"
 
                             entries.append({
-                                "date": str(datetime.datetime.now()),
+                                "date": get_current_date(),
                                 "ip": src_ip,
                                 "host": host,
                                 "url": f"http://{host}{path}"
@@ -156,8 +164,9 @@ def sniff(target_host):
                 elif protocol == 17:
                     domain = parse_dns(packet)
                     if should_add_entry(entries, host=domain):
+
                         entries.append({
-                            "date": str(datetime.datetime.now()),
+                            "date": get_current_date(),
                             "ip": src_ip,
                             "host": domain,
                             "url": f"https://{domain}/..."
