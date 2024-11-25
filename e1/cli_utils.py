@@ -12,5 +12,3 @@ def get_ips_by_input(network):
         ips.append(ip)
 
     return ips
-
-    

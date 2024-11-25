@@ -40,3 +40,42 @@ def find_network_hosts():
         print(f"IP: {ip} - Delay: {delay:.2f}ms")
 
     return list(icmp_results.keys())
+
+
+def select_target_host():
+    hosts = find_network_hosts()
+        
+    if len(hosts) == 0:
+        print("Error: No active hosts found in the network")
+        return
+
+    print(f"\nFound {len(hosts)} active host(s) in the network")
+
+    print("\nSelect the target host to perform the attack:")
+    for host, i in zip(hosts, range(1, len(hosts)+1)):
+        print(f"({i}): {host}")
+    print(f"({len(hosts)+1}): Exit")
+
+    target_host = input("\nEnter the number of the target host: ")
+
+    if not target_host.isdigit() or int(target_host) < 1 or int(target_host) > len(hosts)+1:
+        print("Error: Invalid input")
+        return select_target_host(hosts)
+
+    if int(target_host) == len(hosts)+1:
+        print("Exiting...")
+        sys.exit(0)
+        return None
+
+    target_host = hosts[int(target_host)-1]
+
+    confirmation = input(f"Do you confirm the target {target_host}? (Y/n): ")
+
+    if confirmation.lower() == 'n' or confirmation.lower() == 'no':
+        return select_target_host(hosts)
+    elif confirmation and (confirmation.lower() != 'y' and confirmation.lower() != 'yes'):
+        print("Error: Invalid input")
+        return select_target_host(hosts)
+    
+    print(f"\nTarget host: {target_host}")
+    return target_host

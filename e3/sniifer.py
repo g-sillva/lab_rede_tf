@@ -3,6 +3,12 @@ import struct
 import datetime
 from html import escape
 
+def is_valid_domain(domain):
+    """Check if a domain is valid."""
+    if not domain or len(domain) < 3 or not '.' in domain or 'api' in domain or '--' in domain or domain.startswith('_') or domain.startswith('#') or domain.startswith('(') or 'ssl.' in domain or 'api.' in domain or 'apis.' in domain:
+        return False
+    return True
+
 def generate_html_log(entries):
   """Generate HTML log file."""
   with open("web_history.html", "w") as f:
@@ -34,25 +40,6 @@ def parse_ip_header(packet):
     dest_ip = socket.inet_ntoa(iph[9])
     return protocol, src_ip, dest_ip
 
-
-def parse_dns(packet):
-    """Parse DNS packets."""
-    udp_header = packet[34:42]
-    dns_data = packet[42:]
-    try:
-        query_name = ''
-        i = 0
-        while True:
-            length = dns_data[i]
-            if length == 0:
-                break
-            query_name += dns_data[i + 1:i + 1 + length].decode() + '.'
-            i += length + 1
-        return query_name.rstrip('.')
-    except Exception:
-        return None
-
-
 def parse_http(packet):
     """Parse HTTP packets."""
     http_data = packet[54:]
@@ -69,10 +56,51 @@ def parse_http(packet):
                     parts = line.split(" ")
                     if len(parts) > 1:
                         path = parts[1]
-            if host and '.' in host:
+
+            if is_valid_domain(host):
                 return host, path
+            
+            print('HTTP')
+            return host, path
     except Exception:
         return None
+    
+def parse_dns(packet):
+    """Parse DNS packets."""
+    ip_header = packet[14:34]
+    iph = struct.unpack("!BBHHHBBH4s4s", ip_header)
+    protocol = iph[6]
+    
+    if protocol != 17:  # Verifica se é UDP
+        return None
+
+    udp_header = packet[34:42]
+    src_port, dest_port, length, checksum = struct.unpack("!HHHH", udp_header)
+    
+    if dest_port != 53 and src_port != 53:  # Verifica se é DNS
+        return None
+    
+    dns_data = packet[42:]
+    
+    if len(dns_data) < 12:
+        return None
+    
+    transaction_id, flags, questions, answers, authority, additional = struct.unpack("!HHHHHH", dns_data[:12])
+    
+    if questions > 0:
+        query_data = dns_data[12:]
+        
+        domain = ""
+        i = 0
+        while query_data[i] != 0:
+            length = query_data[i]
+            domain += query_data[i + 1:i + 1 + length].decode("utf-8") + "."
+            i += length + 1
+        
+        domain = domain[:-1]  # Remover o ponto final
+        return domain
+    
+    return None
 
 def parse_tls_sni(packet):
     """Parse SNI from a TLS handshake packet."""
@@ -82,13 +110,14 @@ def parse_tls_sni(packet):
         if len(packet) < tls_handshake_start + 5:
             return None
         
-        handshake_type = packet[tls_handshake_start + 5]  
+        handshake_type = packet[tls_handshake_start + 5]
 
         if handshake_type == 0x01:  # Client Hello
             extensions_offset = tls_handshake_start + 43
 
-            while extensions_offset < len(packet) - 4:
+            while extensions_offset < len(packet) - 1:
                 extension_type = struct.unpack("!H", packet[extensions_offset:extensions_offset + 2])[0]
+                extension_length = struct.unpack("!H", packet[extensions_offset + 2:extensions_offset + 4])[0]
 
                 if extension_type == 0x00:  # Extensão SNI
                     sni_length = struct.unpack("!H", packet[extensions_offset + 4:extensions_offset + 6])[0]
@@ -96,17 +125,13 @@ def parse_tls_sni(packet):
 
                     sni = sni_bytes.decode('utf-8', errors='ignore')
 
-                    # Check if the SNI is a domain name
-                    if not ".com" in sni and not ".net" in sni:
+                    if not is_valid_domain(sni):
                         return None
 
-                    # Clean up the SNI
-                    sni = sni.strip().rstrip('\x00')
-
-                    if sni:
-                        return sni
+                    print('HTTPS')
+                    return sni
                 else:
-                    extensions_offset += 1
+                    extensions_offset += 4 + extension_length
         
     except Exception as e:
         print(f"Error parsing TLS SNI: {e}")
@@ -115,9 +140,9 @@ def parse_tls_sni(packet):
 
 def sniff(target_host):
     """Sniff packets and analyze DNS/HTTP/HTTPS."""
-    sniffer = socket.socket(
-        socket.PF_PACKET, socket.SOCK_RAW, socket.ntohs(0x0003))
+    sniffer = socket.socket(socket.PF_PACKET, socket.SOCK_RAW, socket.ntohs(0x0003))
     entries = []
+
     try:
         print('[*] Starting sniffing...')
         while True:
@@ -131,17 +156,7 @@ def sniff(target_host):
                 if src_ip != target_host:
                     continue
 
-                if protocol == 17:  # UDP (DNS)
-                    query = parse_dns(packet)
-                    if query:
-                        entries.append({
-                            "date": str(datetime.datetime.now()),
-                            "ip": src_ip,
-                            "host": query,
-                            "url": query
-                        })
-
-                elif protocol == 6:  # TCP (HTTP/HTTPS)
+                if protocol == 6:  # TCP, UDP
                     dest_port = struct.unpack("!H", packet[36:38])[0]
 
                     if dest_port == 80: # HTTP
@@ -162,8 +177,18 @@ def sniff(target_host):
                                 "date": str(datetime.datetime.now()),
                                 "ip": src_ip,
                                 "host": sni,
-                                "url": f"https://{sni}"
+                                "url": f"https://{sni}/..."
                             })
+
+                elif protocol == 17:
+                    domain = parse_dns(packet)
+                    if domain:
+                        entries.append({
+                            "date": str(datetime.datetime.now()),
+                            "ip": src_ip,
+                            "host": domain,
+                            "url": f"https://{domain}/..."
+                        })
 
                 generate_html_log(entries)
 

